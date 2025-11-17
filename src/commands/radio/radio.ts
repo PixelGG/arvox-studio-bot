@@ -57,6 +57,19 @@ const command: SlashCommand = {
         )
     )
     .addSubcommand((sub) =>
+      sub
+        .setName('volume')
+        .setDescription('Lautstärke des Radios setzen')
+        .addIntegerOption((opt) =>
+          opt
+            .setName('percent')
+            .setDescription('Lautstärke in Prozent (0-200)')
+            .setMinValue(0)
+            .setMaxValue(200)
+            .setRequired(true)
+        )
+    )
+    .addSubcommand((sub) =>
       sub.setName('status').setDescription('Aktuellen Radio-Status anzeigen')
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Connect),
@@ -173,6 +186,22 @@ const command: SlashCommand = {
         content: `Radio-Stream aktualisiert: ${streamUrl}`,
         ephemeral: true
       });
+    } else if (sub === 'volume') {
+      const percent = interaction.options.getInteger('percent', true);
+
+      try {
+        RadioService.setVolume(guildId, percent);
+        await interaction.reply({
+          content: `Radio-Lautstärke auf ${percent}% gesetzt.`,
+          ephemeral: true
+        });
+      } catch {
+        await interaction.reply({
+          content: 'Radio läuft aktuell nicht – starte es zuerst mit `/radio start`.',
+          ephemeral: true
+        });
+        return;
+      }
     }
 
     // Optional: persistentes Radio-Status-Embed aktualisieren
@@ -190,3 +219,4 @@ const command: SlashCommand = {
 };
 
 export default command;
+

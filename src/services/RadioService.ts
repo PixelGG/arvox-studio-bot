@@ -6,7 +6,8 @@ import {
   joinVoiceChannel,
   VoiceConnectionStatus,
   type AudioPlayer,
-  type VoiceConnection
+  type VoiceConnection,
+  type AudioResource
 } from '@discordjs/voice';
 import axios from 'axios';
 import type {
@@ -26,6 +27,8 @@ interface RadioSession {
   startedAt: Date;
   connection: VoiceConnection;
   player: AudioPlayer;
+  resource: AudioResource | null;
+  volume: number;
 }
 
 export class RadioService {
@@ -61,7 +64,11 @@ export class RadioService {
     connection.subscribe(player);
 
     const response = await axios.get(streamUrl, { responseType: 'stream' });
-    const resource = createAudioResource(response.data);
+    const baseVolume = 1;
+    const resource = createAudioResource(response.data, { inlineVolume: true });
+    if (resource.volume) {
+      resource.volume.setVolume(baseVolume);
+    }
     player.play(resource);
 
     await entersState(player, AudioPlayerStatus.Playing, 30_000);
@@ -72,7 +79,9 @@ export class RadioService {
       streamUrl,
       startedAt: new Date(),
       connection,
-      player
+      player,
+      resource,
+      volume: baseVolume
     };
 
     this.sessions.set(guild.id, session);
@@ -103,11 +112,28 @@ export class RadioService {
     }
 
     const response = await axios.get(streamUrl, { responseType: 'stream' });
-    const resource = createAudioResource(response.data);
+    const resource = createAudioResource(response.data, { inlineVolume: true });
+    if (resource.volume) {
+      resource.volume.setVolume(session.volume ?? 1);
+    }
     session.player.stop();
     session.player.play(resource);
     session.streamUrl = streamUrl;
     session.startedAt = new Date();
+    session.resource = resource;
+  }
+
+  static setVolume(guildId: string, volumePercent: number): void {
+    const session = this.sessions.get(guildId);
+    if (!session || !session.resource || !session.resource.volume) {
+      throw new Error('Radio is not currently playing.');
+    }
+
+    const clamped = Math.max(0, Math.min(volumePercent, 200));
+    const factor = clamped / 100;
+
+    session.volume = factor;
+    session.resource.volume.setVolume(factor);
   }
 
   static getStatusEmbed(
@@ -141,6 +167,8 @@ export class RadioService {
         (member: GuildMember) => member.voice.channelId === session.voiceChannelId
       ).size ?? 0;
 
+    const volumePercent = Math.round((session.volume ?? 1) * 100);
+
     embed.setDescription('Radio is currently playing.');
     embed.addFields(
       { name: 'Voice channel', value: `<#${session.voiceChannelId}>`, inline: true },
@@ -150,7 +178,8 @@ export class RadioService {
         value: `<t:${Math.floor(session.startedAt.getTime() / 1000)}:R> (${uptimeSeconds} Sekunden)`,
         inline: true
       },
-      { name: 'Listeners', value: listeners.toString(), inline: true }
+      { name: 'Listeners', value: listeners.toString(), inline: true },
+      { name: 'Volume', value: `${volumePercent}%`, inline: true }
     );
 
     return embed;
