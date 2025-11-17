@@ -341,23 +341,81 @@ export class TicketService {
     ticket: TicketDocument
   ): Promise<string> {
     const messages = await this.fetchAllMessages(channel);
-    const rows = messages
-      .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
-      .map((msg) => {
-        const time = new Date(msg.createdTimestamp).toISOString();
-        const author = `${msg.author.tag} (${msg.author.id})`;
-        const content = msg.cleanContent || '[kein Text]';
-        const attachments = msg.attachments
-          .map((att) => `<a href="${att.url}">${att.name}</a>`)
-          .join(', ');
+    const sorted = messages.sort((a, b) => a.createdTimestamp - b.createdTimestamp);
 
-        return `<tr>
-  <td>${time}</td>
-  <td>${author}</td>
-  <td>${content}</td>
-  <td>${attachments}</td>
-</tr>`;
+    const messageItems = sorted
+      .map((msg) => {
+        const timeIso = new Date(msg.createdTimestamp).toISOString();
+        const timeDisplay = new Date(msg.createdTimestamp).toLocaleString('de-DE');
+        const authorTag = TicketService.escapeHtml(msg.author.tag);
+        const authorId = msg.author.id;
+        const contentRaw = msg.cleanContent || '[kein Text]';
+        const content = TicketService.escapeHtml(contentRaw).replace(/\n/g, '<br />');
+        const avatarUrl = msg.author.displayAvatarURL({ size: 64 });
+
+        const attachmentsHtml =
+          msg.attachments.size > 0
+            ? `<div class="attachments">
+      ${Array.from(msg.attachments.values())
+        .map(
+          (att) =>
+            `<a href="${att.url}" class="attachment-link">${TicketService.escapeHtml(
+              att.name ?? 'Attachment'
+            )}</a>`
+        )
+        .join('<br />')}
+    </div>`
+            : '';
+
+        return `<article class="message">
+  <header class="message-header">
+    <img class="avatar" src="${avatarUrl}" alt="${authorTag} Avatar" />
+    <div class="author-block">
+      <div class="author-tag">${authorTag}</div>
+      <div class="author-id">${authorId}</div>
+    </div>
+    <time class="timestamp" datetime="${timeIso}">${timeDisplay}</time>
+  </header>
+  <div class="message-content">${content}</div>
+  ${attachmentsHtml}
+</article>`;
       })
+      .join('\n');
+
+    const createdAt = ticket.createdAt ? new Date(ticket.createdAt) : null;
+    const closedAt = ticket.closedAt ? new Date(ticket.closedAt) : null;
+    const durationMs =
+      createdAt && closedAt ? closedAt.getTime() - createdAt.getTime() : undefined;
+    const durationMinutes =
+      durationMs !== undefined ? Math.max(1, Math.round(durationMs / 60000)) : undefined;
+
+    const metaRows = [
+      `<div><span class="meta-label">Ticket-ID:</span> <span class="meta-value">${ticket.id}</span></div>`,
+      `<div><span class="meta-label">Guild:</span> <span class="meta-value">${TicketService.escapeHtml(
+        channel.guild.name
+      )} (${channel.guild.id})</span></div>`,
+      `<div><span class="meta-label">Channel:</span> <span class="meta-value">#${TicketService.escapeHtml(
+        channel.name
+      )} (${channel.id})</span></div>`,
+      `<div><span class="meta-label">Erstellt von:</span> <span class="meta-value">${ticket.creatorId}</span></div>`,
+      ticket.assignedSupportId
+        ? `<div><span class="meta-label">Bearbeiter:</span> <span class="meta-value">${ticket.assignedSupportId}</span></div>`
+        : '',
+      createdAt
+        ? `<div><span class="meta-label">Erstellt am:</span> <span class="meta-value">${createdAt.toLocaleString(
+            'de-DE'
+          )}</span></div>`
+        : '',
+      closedAt
+        ? `<div><span class="meta-label">Geschlossen am:</span> <span class="meta-value">${closedAt.toLocaleString(
+            'de-DE'
+          )}</span></div>`
+        : '',
+      durationMinutes !== undefined
+        ? `<div><span class="meta-label">Dauer:</span> <span class="meta-value">${durationMinutes} Minuten</span></div>`
+        : ''
+    ]
+      .filter(Boolean)
       .join('\n');
 
     return `<!DOCTYPE html>
@@ -366,32 +424,222 @@ export class TicketService {
     <meta charset="UTF-8" />
     <title>Ticket ${ticket.id} Transcript</title>
     <style>
-      body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 1rem; }
-      table { width: 100%; border-collapse: collapse; }
-      th, td { border: 1px solid #ccc; padding: 0.5rem; vertical-align: top; }
-      th { background: #f5f5f5; }
-      tr:nth-child(even) { background: #fafafa; }
+      :root {
+        color-scheme: dark;
+        --bg: #020617;
+        --bg-elevated: #020617;
+        --card: #020617;
+        --card-border: #1f2937;
+        --accent: #38bdf8;
+        --accent-soft: rgba(56, 189, 248, 0.15);
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 1.5rem;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: radial-gradient(circle at top, #0f172a 0, #020617 50%, #020617 100%);
+        color: var(--text);
+      }
+
+      .layout {
+        max-width: 960px;
+        margin: 0 auto;
+      }
+
+      header.page-header {
+        margin-bottom: 1.5rem;
+      }
+
+      .ticket-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+      }
+
+      .ticket-subtitle {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .meta-card {
+        background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.95));
+        border-radius: 0.75rem;
+        border: 1px solid var(--card-border);
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+      }
+
+      .meta-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.35rem 1.5rem;
+        font-size: 0.9rem;
+      }
+
+      .meta-label {
+        color: var(--muted);
+        font-weight: 500;
+        margin-right: 0.25rem;
+      }
+
+      .meta-value {
+        color: var(--text);
+      }
+
+      .messages-section-title {
+        margin: 1rem 0 0.5rem;
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      .messages {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .message {
+        background: rgba(15, 23, 42, 0.9);
+        border-radius: 0.75rem;
+        border: 1px solid var(--card-border);
+        padding: 0.75rem 1rem;
+      }
+
+      .message-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.35rem;
+      }
+
+      .avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+      }
+
+      .author-block {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+      }
+
+      .author-tag {
+        font-weight: 600;
+      }
+
+      .author-id {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .timestamp {
+        margin-left: auto;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .message-content {
+        font-size: 0.95rem;
+        line-height: 1.4;
+        white-space: normal;
+        padding: 0.3rem 0 0.1rem;
+      }
+
+      .attachments {
+        margin-top: 0.35rem;
+        padding-top: 0.25rem;
+        border-top: 1px dashed rgba(148, 163, 184, 0.5);
+      }
+
+      .attachment-link {
+        color: var(--accent);
+        text-decoration: none;
+        font-size: 0.9rem;
+      }
+
+      .attachment-link:hover {
+        text-decoration: underline;
+      }
+
+      .hint {
+        margin-top: 1.5rem;
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      @media (max-width: 640px) {
+        body {
+          padding: 1rem;
+        }
+
+        .message-header {
+          align-items: flex-start;
+          flex-wrap: wrap;
+        }
+
+        .timestamp {
+          margin-left: 0;
+        }
+      }
     </style>
   </head>
   <body>
-    <h1>Ticket ${ticket.id} Transcript</h1>
-    <p>Guild: ${channel.guild.name} (${channel.guild.id})</p>
-    <p>Channel: #${channel.name} (${channel.id})</p>
-    <table>
-      <thead>
-        <tr>
-          <th>Zeit</th>
-          <th>Autor</th>
-          <th>Nachricht</th>
-          <th>Attachments</th>
-        </tr>
-      </thead>
-      <tbody>
-${rows}
-      </tbody>
-    </table>
+    <main class="layout">
+      <header class="page-header">
+        <div class="ticket-title">Ticket #${ticket.id} – Transcript</div>
+        <div class="ticket-subtitle">
+          Export der Unterhaltung aus Discord – nur intern verwenden.
+        </div>
+      </header>
+
+      <section class="meta-card">
+        <div class="meta-grid">
+${metaRows}
+        </div>
+      </section>
+
+      <section>
+        <div class="messages-section-title">Nachrichtenverlauf</div>
+        <div class="messages">
+${messageItems}
+        </div>
+      </section>
+
+      <p class="hint">
+        Hinweis: Inhalte stammen direkt aus Discord. Gelöschte Nachrichten zum Zeitpunkt des Exports
+        sind hier nicht enthalten.
+      </p>
+    </main>
   </body>
 </html>`;
+  }
+
+  private static escapeHtml(text: string): string {
+    return text.replace(/[&<>"']/g, (char) => {
+      switch (char) {
+        case '&':
+          return '&amp;';
+        case '<':
+          return '&lt;';
+        case '>':
+          return '&gt;';
+        case '"':
+          return '&quot;';
+        case "'":
+          return '&#39;';
+        default:
+          return char;
+      }
+    });
   }
 
   private static async fetchAllMessages(channel: TextChannel) {
