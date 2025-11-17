@@ -181,4 +181,87 @@ jobs:
         run: |
           echo "Hier später z.B.:"
           echo "npm install"
-          ech
+          echo "npm run build"
+          echo "und dann den Bot über SSH/Docker deployen."
+
+      - name: Deployment ausführen
+        run: |
+          echo "TODO: Dein echtes Deployment-Kommando eintragen (ssh, docker, pm2, etc.)"
+
+      # Deployment erfolgreich
+      - name: Notify Discord on deployment success
+        if: ${{ success() }}
+        shell: bash
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_DEPLOYS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "FEHLER: DISCORD_WEBHOOK_URL (Deploys) ist leer."
+            exit 1
+          fi
+
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          payload=$(cat <<EOF
+          {
+            "username": "Arvox Studio CI",
+            "embeds": [{
+              "title": "🚀 Deployment erfolgreich",
+              "url": "${RUN_URL}",
+              "description": "Repo: **${GITHUB_REPOSITORY}**",
+              "color": 5763719,
+              "fields": [
+                { "name": "Run ID", "value": "${GITHUB_RUN_ID}", "inline": true },
+                { "name": "Commit", "value": "\`${SHORT_SHA}\`", "inline": true },
+                { "name": "Actor", "value": "${GITHUB_ACTOR}", "inline": true }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )
+
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK_URL"
+
+      # Deployment fehlgeschlagen
+      - name: Notify Discord on deployment failure
+        if: ${{ failure() }}
+        shell: bash
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_DEPLOYS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "FEHLER: DISCORD_WEBHOOK_URL (Deploys) ist leer."
+            exit 1
+          fi
+
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          payload=$(cat <<EOF
+          {
+            "username": "Arvox Studio CI",
+            "embeds": [{
+              "title": "⚠️ Deployment fehlgeschlagen",
+              "url": "${RUN_URL}",
+              "description": "Repo: **${GITHUB_REPOSITORY}**",
+              "color": 15548997,
+              "fields": [
+                { "name": "Run ID", "value": "${GITHUB_RUN_ID}", "inline": true },
+                { "name": "Commit", "value": "\`${SHORT_SHA}\`", "inline": true },
+                { "name": "Actor", "value": "${GITHUB_ACTOR}", "inline": true }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )
+
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK_URL"
