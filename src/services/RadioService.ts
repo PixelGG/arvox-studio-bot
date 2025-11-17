@@ -176,6 +176,18 @@ export class RadioService {
     session.resource.volume.setVolume(factor);
   }
 
+  static async shutdownAll(): Promise<void> {
+    for (const session of this.sessions.values()) {
+      try {
+        session.player.stop();
+        session.connection.destroy();
+      } catch {
+        // ignore cleanup errors
+      }
+    }
+    this.sessions.clear();
+  }
+
   static async resumeFromState(client: Client, config: AppConfig): Promise<void> {
     const states = await RadioStateModel.find({ isPlaying: true }).exec();
 
