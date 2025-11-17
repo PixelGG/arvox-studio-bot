@@ -19,6 +19,7 @@ import type {
 } from 'discord.js';
 import { EmbedBuilder as DiscordEmbedBuilder } from 'discord.js';
 import type { AppConfig, GuildConfig } from '../types/config';
+import { RadioStateModel } from '../db/models/RadioState';
 
 interface RadioSession {
   guildId: string;
@@ -85,6 +86,21 @@ export class RadioService {
     };
 
     this.sessions.set(guild.id, session);
+
+    try {
+      await RadioStateModel.findOneAndUpdate(
+        { guildId: guild.id },
+        {
+          guildId: guild.id,
+          voiceChannelId: channel.id,
+          streamUrl,
+          isPlaying: true
+        },
+        { upsert: true }
+      ).exec();
+    } catch {
+      // ignore persistence errors
+    }
   }
 
   static async stop(guildId: string): Promise<void> {
@@ -94,6 +110,15 @@ export class RadioService {
     session.player.stop();
     session.connection.destroy();
     this.sessions.delete(guildId);
+
+    try {
+      await RadioStateModel.updateOne(
+        { guildId },
+        { $set: { isPlaying: false } }
+      ).exec();
+    } catch {
+      // ignore persistence errors
+    }
   }
 
   static async setStream(
@@ -121,6 +146,21 @@ export class RadioService {
     session.streamUrl = streamUrl;
     session.startedAt = new Date();
     session.resource = resource;
+
+    try {
+      await RadioStateModel.findOneAndUpdate(
+        { guildId },
+        {
+          guildId,
+          voiceChannelId: session.voiceChannelId,
+          streamUrl,
+          isPlaying: true
+        },
+        { upsert: true }
+      ).exec();
+    } catch {
+      // ignore persistence errors
+    }
   }
 
   static setVolume(guildId: string, volumePercent: number): void {
@@ -134,6 +174,21 @@ export class RadioService {
 
     session.volume = factor;
     session.resource.volume.setVolume(factor);
+  }
+
+  static async resumeFromState(client: Client, config: AppConfig): Promise<void> {
+    const states = await RadioStateModel.find({ isPlaying: true }).exec();
+
+    for (const state of states) {
+      if (!config.guilds[state.guildId]) {
+        continue;
+      }
+      try {
+        await this.start(client, state.guildId, state.voiceChannelId, state.streamUrl);
+      } catch {
+        // ignore errors for invalid channels/streams during resume
+      }
+    }
   }
 
   static getStatusEmbed(

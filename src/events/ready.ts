@@ -3,6 +3,7 @@ import type { DiscordEvent } from '../types/events';
 import type { AppConfig } from '../types/config';
 import { GithubService } from '../services/GithubService';
 import { GiveawayService } from '../services/GiveawayService';
+import { RadioService } from '../services/RadioService';
 
 const event: DiscordEvent = {
   name: 'ready',
@@ -13,6 +14,7 @@ const event: DiscordEvent = {
 
     await GiveawayService.resumeRunningGiveaways(client);
     await GithubService.startPolling(client, config);
+    await RadioService.resumeFromState(client, config);
   }
 };
 
