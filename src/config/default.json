@@ -1,0 +1,160 @@
+{
+  "guilds": [
+    {
+      "id": "1435897057654214690",
+      "channels": {
+        "welcome": "1435907677443330069",
+        "rules": "1435907680626675784",
+        "info": "1435907682975486035",
+        "roles": "1435907685651578901",
+        "announcements": "1435907715020095499",
+        "tickets": "1435907704534077513",
+        "support": "1435907701606449223",
+        "supportLog": "1435907707558170644",
+        "ticketArchive": "1435907762432381024",
+        "giveaways": "1435907754685632533",
+        "projectIndex": "1435907728659841168",
+        "staffAnnouncements": "1435907715020095499",
+        "modQueue": "1435907719021334570",
+        "auditLog": "1435907720917028886",
+        "joinLeaveLog": "1435907758749651125",
+        "automodLog": "1435907761262170152",
+        "standup": "1435907717544939550"
+      },
+      "roles": {
+        "owner": "1435907639866298419",
+        "admin": "1435907641065865238",
+        "devLead": "1435907642399653961",
+        "support": "1435907643800555580",
+        "moderator": "1435907644866035762",
+        "member": "1435907651031531592",
+        "verified": "1435907649601536020",
+        "muted": "1435907652348674068",
+        "novaUpdates": "1435907657021001728",
+        "playtest": "1435907655557447761",
+        "events": "1435907654265344081",
+        "news": "1435907653388734544"
+      },
+      "welcome": {
+        "enabled": true,
+        "channelId": "1435907677443330069",
+        "autoRoles": [],
+        "dmEnabled": true
+      },
+      "rules": {
+        "channelId": "1435907680626675784",
+        "acceptRoles": [
+          "1435907649601536020",
+          "1435907651031531592"
+        ],
+        "sections": [
+          {
+            "title": "Allgemeines Verhalten",
+            "description": "Sei respektvoll, freundlich und hilfsbereit. Keine Beleidigungen, Diskriminierung oder Belästigung.",
+            "order": 1
+          },
+          {
+            "title": "Spam & Werbung",
+            "description": "Kein Spam, keine unerlaubte Werbung oder unaufgeforderte Links.",
+            "order": 2
+          },
+          {
+            "title": "NSFW & Inhalte",
+            "description": "Keine NSFW-Inhalte oder andere unangebrachte Inhalte.",
+            "order": 3
+          }
+        ]
+      },
+      "info": {
+        "channelId": "1435907682975486035",
+        "description": "Willkommen bei Arvox Studio – hier dreht sich alles um Games, Projekte und Community!",
+        "links": [
+          {
+            "label": "GitHub",
+            "url": "https://github.com/PixelGG"
+          },
+          {
+            "label": "Website",
+            "url": "https://example.com"
+          }
+        ]
+      },
+      "rolesPanel": {
+        "channelId": "1435907685651578901",
+        "options": [
+          {
+            "label": "Nova Updates",
+            "description": "Erhalte News zu Nova.",
+            "roleId": "1435907657021001728"
+          },
+          {
+            "label": "Playtest",
+            "description": "Interessiert an Playtests?",
+            "roleId": "1435907655557447761"
+          },
+          {
+            "label": "Events",
+            "description": "Infos zu Community-Events.",
+            "roleId": "1435907654265344081"
+          },
+          {
+            "label": "News",
+            "description": "Wichtige Studio-News.",
+            "roleId": "1435907653388734544"
+          }
+        ]
+      },
+      "music": {
+        "enabled": true,
+        "voiceChannelId": "1435907695453405215",
+        "streamUrl": "https://example.com/stream.mp3",
+        "streamName": "Default Radio",
+        "presets": {
+          "chill": "https://example.com/chill.mp3",
+          "hits": "https://example.com/hits.mp3"
+        }
+      },
+      "github": {
+        "username": "PixelGG",
+        "ignoredRepos": [
+          "PixelGG"
+        ],
+        "channelId": "1435907728659841168",
+        "trackAllPublicRepos": true,
+        "trackedRepos": [],
+        "pollingIntervalMinutes": 60
+      },
+      "supportQueue": {
+        "enabled": true,
+        "queueVoiceChannelId": "1435929552961667093",
+        "supportVoiceChannelIds": [
+          "1435907708866793563",
+          "1435907709818896446",
+          "1435907711106813984"
+        ],
+        "statusMessageChannelId": "1435907701606449223"
+      },
+      "tickets": {
+        "panelChannelId": "1435929551711502406",
+        "categoryId": "1435907698364514365",
+        "supportLogChannelId": "1435907707558170644",
+        "ticketArchiveChannelId": "1435907762432381024",
+        "useThreads": false
+      },
+      "giveaways": {
+        "defaultChannelId": "1435907754685632533"
+      },
+      "logging": {
+        "joinLeaveChannelId": "1435907758749651125",
+        "automodChannelId": "1435907761262170152",
+        "auditChannelId": "1435907720917028886",
+        "supportLogChannelId": "1435907707558170644",
+        "ticketArchiveChannelId": "1435907762432381024"
+      },
+      "standup": {
+        "channelId": "1435907717544939550"
+      }
+    }
+  ]
+}
+
