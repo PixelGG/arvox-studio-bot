@@ -1,0 +1,184 @@
+name: Arvox Studio Bot – CI / CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:   # optional: für manuelles Deployment
+
+jobs:
+  # 1) Commit-Meldung
+  notify-commit:
+    if: ${{ github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify Discord about commit
+        shell: bash
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_COMMITS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "FEHLER: DISCORD_WEBHOOK_URL (Commits) ist leer."
+            exit 1
+          fi
+
+          COMMIT_URL="https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          payload=$(cat <<EOF
+          {
+            "username": "Arvox Studio CI",
+            "embeds": [{
+              "title": "Neuer Commit auf ${GITHUB_REF_NAME}",
+              "url": "${COMMIT_URL}",
+              "description": "Repo: **${GITHUB_REPOSITORY}**",
+              "color": 3447003,
+              "fields": [
+                { "name": "Author", "value": "${GITHUB_ACTOR}", "inline": true },
+                { "name": "Commit", "value": "\`${SHORT_SHA}\`", "inline": true },
+                { "name": "Event", "value": "${GITHUB_EVENT_NAME}", "inline": true }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )
+
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK_URL"
+
+  # 2) Build / CI (Root-Projekt: arvox-studio-bot)
+  build:
+    runs-on: ubuntu-latest
+    # läuft bei push + PR
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: |
+          npm install
+
+      - name: Type check (wenn tsconfig vorhanden)
+        run: |
+          if [ -f tsconfig.json ]; then
+            npx tsc --noEmit
+          else
+            echo "Keine tsconfig.json gefunden – Type-Check wird übersprungen."
+          fi
+
+      # Hier können später Unit-Tests oder Linting ergänzt werden
+      # - name: Run tests
+      #   run: npm test
+
+      # Discord: Build erfolgreich (Embed)
+      - name: Notify Discord on build success
+        if: ${{ success() }}
+        shell: bash
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_BUILDS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "FEHLER: DISCORD_WEBHOOK_URL (Builds) ist leer."
+            exit 1
+          fi
+
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          payload=$(cat <<EOF
+          {
+            "username": "Arvox Studio CI",
+            "embeds": [{
+              "title": "✅ Build erfolgreich",
+              "url": "${RUN_URL}",
+              "description": "Repo: **${GITHUB_REPOSITORY}**\\nBranch: **${GITHUB_REF_NAME}**",
+              "color": 5763719,
+              "fields": [
+                { "name": "Workflow", "value": "${GITHUB_WORKFLOW}", "inline": true },
+                { "name": "Run ID", "value": "${GITHUB_RUN_ID}", "inline": true },
+                { "name": "Commit", "value": "\`${SHORT_SHA}\`", "inline": true },
+                { "name": "Actor", "value": "${GITHUB_ACTOR}", "inline": true }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )
+
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK_URL"
+
+      # Discord: Build fehlgeschlagen (Embed)
+      - name: Notify Discord on build failure
+        if: ${{ failure() }}
+        shell: bash
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_BUILDS_WEBHOOK_URL }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "FEHLER: DISCORD_WEBHOOK_URL (Builds) ist leer."
+            exit 1
+          fi
+
+          RUN_URL="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          SHORT_SHA="${GITHUB_SHA::7}"
+
+          payload=$(cat <<EOF
+          {
+            "username": "Arvox Studio CI",
+            "embeds": [{
+              "title": "❌ Build fehlgeschlagen",
+              "url": "${RUN_URL}",
+              "description": "Repo: **${GITHUB_REPOSITORY}**\\nBranch: **${GITHUB_REF_NAME}**",
+              "color": 15548997,
+              "fields": [
+                { "name": "Workflow", "value": "${GITHUB_WORKFLOW}", "inline": true },
+                { "name": "Run ID", "value": "${GITHUB_RUN_ID}", "inline": true },
+                { "name": "Commit", "value": "\`${SHORT_SHA}\`", "inline": true },
+                { "name": "Actor", "value": "${GITHUB_ACTOR}", "inline": true }
+              ],
+              "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            }]
+          }
+          EOF
+          )
+
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d "$payload" \
+            "$DISCORD_WEBHOOK_URL"
+
+  # 3) Deployment (nur bei workflow_dispatch, also manuell)
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build / Vorbereitung fürs Deployment
+        run: |
+          echo "Hier später z.B.:"
+          echo "npm install"
+          ech
