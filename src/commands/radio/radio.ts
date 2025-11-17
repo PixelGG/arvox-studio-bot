@@ -190,7 +190,7 @@ const command: SlashCommand = {
       const percent = interaction.options.getInteger('percent', true);
 
       try {
-        RadioService.setVolume(guildId, percent);
+        await RadioService.setVolume(guildId, percent);
         await interaction.reply({
           content: `Radio-Lautstärke auf ${percent}% gesetzt.`,
           ephemeral: true
@@ -219,4 +219,3 @@ const command: SlashCommand = {
 };
 
 export default command;
-

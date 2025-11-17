@@ -43,7 +43,8 @@ export class RadioService {
     client: Client,
     guildId: string,
     voiceChannelId: string,
-    streamUrl: string
+    streamUrl: string,
+    initialVolumePercent?: number
   ): Promise<void> {
     const guild = await client.guilds.fetch(guildId);
     const channel = (await guild.channels.fetch(
@@ -65,7 +66,11 @@ export class RadioService {
     connection.subscribe(player);
 
     const response = await axios.get(streamUrl, { responseType: 'stream' });
-    const baseVolume = 1;
+    const volumePercent =
+      initialVolumePercent !== undefined
+        ? Math.max(0, Math.min(initialVolumePercent, 200))
+        : 100;
+    const baseVolume = volumePercent / 100;
     const resource = createAudioResource(response.data, { inlineVolume: true });
     if (resource.volume) {
       resource.volume.setVolume(baseVolume);
@@ -94,7 +99,8 @@ export class RadioService {
           guildId: guild.id,
           voiceChannelId: channel.id,
           streamUrl,
-          isPlaying: true
+          isPlaying: true,
+          volumePercent
         },
         { upsert: true }
       ).exec();
@@ -154,7 +160,8 @@ export class RadioService {
           guildId,
           voiceChannelId: session.voiceChannelId,
           streamUrl,
-          isPlaying: true
+          isPlaying: true,
+          volumePercent: Math.round((session.volume ?? 1) * 100)
         },
         { upsert: true }
       ).exec();
@@ -163,7 +170,7 @@ export class RadioService {
     }
   }
 
-  static setVolume(guildId: string, volumePercent: number): void {
+  static async setVolume(guildId: string, volumePercent: number): Promise<void> {
     const session = this.sessions.get(guildId);
     if (!session || !session.resource || !session.resource.volume) {
       throw new Error('Radio is not currently playing.');
@@ -174,6 +181,15 @@ export class RadioService {
 
     session.volume = factor;
     session.resource.volume.setVolume(factor);
+
+    try {
+      await RadioStateModel.updateOne(
+        { guildId },
+        { $set: { volumePercent: clamped } }
+      ).exec();
+    } catch {
+      // ignore persistence errors
+    }
   }
 
   static async shutdownAll(): Promise<void> {
@@ -196,7 +212,13 @@ export class RadioService {
         continue;
       }
       try {
-        await this.start(client, state.guildId, state.voiceChannelId, state.streamUrl);
+        await this.start(
+          client,
+          state.guildId,
+          state.voiceChannelId,
+          state.streamUrl,
+          state.volumePercent
+        );
       } catch {
         // ignore errors for invalid channels/streams during resume
       }
