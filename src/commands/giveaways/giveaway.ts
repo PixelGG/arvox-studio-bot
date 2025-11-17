@@ -22,13 +22,6 @@ const command: SlashCommand = {
       sub
         .setName('create')
         .setDescription('Neues Giveaway erstellen')
-        .addChannelOption((opt) =>
-          opt
-            .setName('channel')
-            .setDescription('Channel für das Giveaway (optional)')
-            .addChannelTypes(ChannelType.GuildText)
-            .setRequired(false)
-        )
         .addStringOption((opt) =>
           opt.setName('prize').setDescription('Preis des Giveaways').setRequired(true)
         )
@@ -45,6 +38,13 @@ const command: SlashCommand = {
             .setDescription('Dauer in Minuten')
             .setMinValue(1)
             .setRequired(true)
+        )
+        .addChannelOption((opt) =>
+          opt
+            .setName('channel')
+            .setDescription('Channel für das Giveaway (optional)')
+            .addChannelTypes(ChannelType.GuildText)
+            .setRequired(false)
         )
     )
     .addSubcommand((sub) =>
@@ -147,3 +147,4 @@ const command: SlashCommand = {
 };
 
 export default command;
+
