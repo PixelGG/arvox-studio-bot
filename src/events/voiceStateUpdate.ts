@@ -170,9 +170,20 @@ const event: DiscordEvent = {
           }
         }
       }
+
+      // Always keep radio_status panel in sync with current state
+      await PersistentMessageService.ensurePersistentMessage(
+        client,
+        guildId,
+        'radio_status',
+        guildConfig.channels.info,
+        () => {
+          const embed = RadioService.getStatusEmbed(guild, config);
+          return { embeds: [embed] };
+        }
+      );
     }
   }
 };
 
 export default event;
-
