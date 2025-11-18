@@ -91,8 +91,13 @@ const command: SlashCommand = {
     }
 
     const embed = new EmbedBuilder()
+      .setColor(0xf97316) // orange Akzent für öffentliche Ankündigungen
       .setTitle(title)
       .setDescription(message)
+      .setAuthor({
+        name: interaction.guild.name,
+        iconURL: interaction.guild.iconURL({ size: 128 }) ?? undefined
+      })
       .setFooter({ text: `Von ${interaction.user.tag}` })
       .setTimestamp(new Date());
 

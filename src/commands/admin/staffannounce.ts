@@ -77,8 +77,13 @@ const command: SlashCommand = {
     }
 
     const embed = new EmbedBuilder()
+      .setColor(0xfacc15) // gelber Akzent für Staff-Ankündigungen
       .setTitle(title)
       .setDescription(message)
+      .setAuthor({
+        name: `${interaction.guild.name} · Staff`,
+        iconURL: interaction.guild.iconURL({ size: 128 }) ?? undefined
+      })
       .setFooter({ text: `Von ${interaction.user.tag}` })
       .setTimestamp(new Date());
 
