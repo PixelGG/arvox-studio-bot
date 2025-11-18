@@ -1,296 +1,270 @@
-# 🤖 Arvox Studio Bot
+# Arvox Studio Bot
 
-Ein modularer, voll konfigurierbarer Discord-Bot für den **Arvox Studio** Server.  
-Fokus: klare Strukturen, saubere Embeds, möglichst wenig Spam im Channel durch ein **Persistent-Embed-System**.
+Ein modularer, produktionsnaher Discord-Bot für den **Arvox Studio** Server.  
+Fokus: klare Strukturen, saubere Embeds und möglichst wenig Spam im Channel durch ein **Persistent-Embed-System**.
 
 > Onboarding · Self-Roles · Tickets & HTML-Transcripts · Voice-Support-Queue · 24/7 Radio · GitHub-Projektindex · Staff-Tools
 
 ---
 
-## 🧩 Tech & Status
+## Tech & Status
 
-- **Sprache:** TypeScript (Node.js)
+- **Sprache:** TypeScript (Node.js 20)
 - **Library:** discord.js v14
-- **Extras:** @discordjs/voice, DB (z. B. MongoDB / PostgreSQL), Express (für Webhooks)
-- **Ziel:** Saubere, modulare Architektur mit Services + Commands + Events
+- **Voice:** @discordjs/voice (+ Opus, FFmpeg, DAVE)
+- **DB:** MongoDB via mongoose
+- **HTTP:** axios (GitHub API)
 
 ---
 
-## 📚 Inhaltsverzeichnis
+## Feature-Overview
 
-1. [Feature-Overview](#-feature-overview)
-2. [Start Here](#-start-here)
-3. [User Lounge & Radio](#-user-lounge--radio)
-4. [Support & Tickets](#-support--tickets)
-5. [Community](#-community)
-6. [Studio Projects / GitHub](#-studio-projects--github)
-7. [Team (Staff)](#-team-staff)
-8. [Archive & Security](#-archive--security)
-9. [Persistent-Embed-System](#-persistent-embed-system)
-10. [Projektstruktur](#-projektstruktur-geplant)
-11. [Setup](#-setup-geplant)
-12. [Roadmap](#-roadmap-auszug)
-13. [Lizenz](#-lizenz)
+| Bereich               | Kernfunktionen                                                                                      |
+|----------------------|-----------------------------------------------------------------------------------------------------|
+| Start Here           | Welcome, Rules, Info, Announcements, Self-Roles                                                    |
+| User Lounge & Radio  | 24/7 Radio mit Auto-Join/Leave, Radio-Status-Panel                                                 |
+| Support              | Ticket-Panel, Ticket-Channels, HTML-Transcripts, Support-Log, Voice-Support-Queue                  |
+| Community            | Giveaways mit Slash-Commands & Buttons                                                              |
+| Studio Projects      | GitHub-Projektindex als persistentes Embed                                                          |
+| Team (Staff)         | Staff Announcements, Öffentliche Announcements, Standup, Mod-Queue, Audit-Log                      |
+| Archive & Security   | Join/Leave-Log, AutoMod-Log, Ticket-Archive                                                         |
+| Cross-Cutting System | Persistent Embeds (Single-Embed-System für Panels & Status-Overviews)                              |
 
 ---
 
-## ✨ Feature-Overview
+## Start Here
 
-| Bereich               | Kernfunktionen                                                                                           |
-|----------------------|----------------------------------------------------------------------------------------------------------|
-| Start Here           | Welcome, Rules, Info, Announcements, Self-Roles                                                         |
-| User Lounge          | Intro/Onboarding, 24/7 Radio im `Music` Voice-Channel                                                   |
-| Support              | Tickets, HTML-Transcripts, Support-Log, Voice-Support-Queue                                             |
-| Community            | Giveaways mit Slash-Commands & Buttons                                                                  |
-| Studio Projects      | GitHub-Projektindex als statisches, persistentes Embed                                                  |
-| Team (Staff)         | Staff Announcements, Standup, Mod-Queue, Audit-Log                                                      |
-| Archive & Security   | Join/Leave-Log, AutoMod-Log, Ticket-Archive                                                             |
-| Cross-Cutting System | Persistent Embeds (Single-Embed-System für Panels & Status-Overviews)                                  |
+### Welcome
 
----
+- Automatisches **Welcome-Embed** bei `guildMemberAdd`.
+- Optional: Willkommens-DM (konfigurierbar).
+- Auto-Roles nach Regel-Akzept über das Rules-System.
 
-## 🚀 Start Here
+### Rules (Regelwerk)
 
-### 👋 Welcome
-
-- Automatisches **Welcome-Embed** bei `guildMemberAdd`
-- Optional: Willkommens-DM
-- Auto-Roles nach Regel-Akzept, z. B.:
-  - `Verified`
-  - `Member`
-
----
-
-### 📜 Rules (Regelwerk)
-
-- Regeln als **konfigurierbare Embeds**
-- Ein zentrales Regel-Embed mit:
-  - Klar strukturierten Sections
-  - Button „**Regeln akzeptieren**“
+- Regeln als **konfigurierbare Sections** in der Config (`rules.sections`).
+- Panel wird über `/rules post` gesetzt:
+  - Mehrere Embeds (Section-basiert).
+  - Button „Regeln akzeptieren“ (`rules_accept`).
 - Beim Klick:
-  - Zuweisung definierter Rollen (z. B. `Verified`, `Member`)
-  - Logging der Aktion (Zeitpunkt, User)
+  - Zuweisung von `rules.acceptRoles` (z. B. `Verified`, `Member`).
+  - Logging via `LoggingService` in den Audit-Log.
+- Panel nutzt `PersistentMessageService` → eine Message, nur `edit`, kein Spam.
 
-> Das Regel-Embed wird nicht jedes Mal neu gepostet, sondern über das Persistent-Embed-System **bearbeitet**.
+### Info
 
----
+- Statisches **Info-Embed** mit:
+  - Beschreibung des Servers.
+  - Wichtige Kategorien & Channel-Links.
+  - Externe Links (GitHub, Website, etc.).
+- Gesetzt über `/info post`.
+- Persistentes Embed (`info_main`) im konfigurierten Info-Channel.
 
-### ℹ️ Info
+### Announcements
 
-- Ein statisches **Info-Embed** mit:
-  - Kurzbeschreibung des Servers
-  - Wichtige Kategorien & Channel-Links
-  - Externe Links (GitHub, Website, etc.)
-- Ebenfalls als **persistentes Embed** umgesetzt.
+- Öffentliche Ankündigungen via `/announce create`:
+  - Titel, Text, optionales Bild/Thumbnail.
+  - Optionale Ping-Rolle (z. B. `Nova Updates`, `Events`, `Playtest`).
+  - Postet in `channels.announcements`.
+- Staff-Announcements via `/staffannounce create`:
+  - Nur intern für `staffAnnouncements`-Channel.
+  - Ebenfalls mit optionalem Ping.
+- Historie bleibt vollständig sichtbar (kein Persistent-Panel, jede Ankündigung ist eine eigene Message).
 
----
+### Roles (Self-Roles)
 
-### 📢 Announcements
-
-- Slash-Commands zum Erstellen von Ankündigungen:
-  - Titel, Text, optionales Bild/Thumbnail
-  - Optionaler Ping von Rollen wie `Nova Updates`, `Events`, `Playtest`
-- Historie ist gewünscht → **keine** Ersetzung über Persistenz, jede Ankündigung bleibt im Verlauf sichtbar.
-
----
-
-### 🎭 Roles (Self-Roles)
-
-- Rollen-Panel mit Buttons oder Select-Menü:
-  - `Nova Updates`
-  - `Playtest`
-  - `Events`
-  - `News`
-- Nutzer können sich Benachrichtigungsrollen selbst zuweisen.
-- Ein einziges zentrales **„Roles Panel“-Embed**, das bei Änderungen nur **editiert** wird.
+- Rollen-Panel als Select-Menü:
+  - Typische Rollen: `Nova Updates`, `Playtest`, `Events`, `News`.
+- `/roles post`:
+  - Setzt oder aktualisiert das persistente `roles_panel` im konfigurierten Roles-Channel.
+  - User können ihre Benachrichtigungsrollen selbst toggeln.
 
 ---
 
-## 🛋 User Lounge & Radio
+## User Lounge & Radio
 
-### 🧑‍🤝‍🧑 User Lounge
+### Radio (24/7 Musik)
 
-- Optionales Info/Welcome-Panel in `#lobby` / `#introductions`
-- Kleine Automatisierungen:
-  - Erste Nachricht in `#introductions` kann automatisch begrüßt werden
-  - Hinweise, wohin neue Nutzer als Nächstes gehen sollten
+- Konfigurierbarer Radiostream (z. B. externe Webradio-URLs).
+- Voice-Channel aus Config (`music.voiceChannelId`).
+- Features:
+  - **Auto-Join**: Bot joint den Musik-Channel nur, wenn mindestens ein User drin ist.
+  - **Auto-Leave**: Wenn der letzte nicht-Bot den Channel verlässt, disconnectet der Bot.
+  - **Auto-Resume**: Nach Neustart/crash wird das Radio wieder gestartet, wenn Hörer im Channel sind.
+  - **Persistente Lautstärke**: Volume wird pro Guild gespeichert und wiederhergestellt.
 
----
+**Commands (`/radio`):**
 
-### 🎧 24/7 Radio-Musik
+- `/radio panel`  
+  - Setzt/aktualisiert das Radio-Status-Panel (`radio_status`) im Info-Channel.
 
-- Dauerhafte Musik im Voice-Channel `Music`
-- Konfigurierbare Radiostream-URL (z. B. [I Love Music Streams](https://ilovemusic.de/streams))
-- Geplante Commands:
-  - `/radio start` – Radio im konfigurierten Voice-Channel starten
-  - `/radio stop` – Radio stoppen
-  - `/radio set-stream` – Radiokanal wechseln
-  - `/radio status` – aktueller Status, Uptime, Hörer etc.
-- Auto-Reconnect & Auto-Join nach Bot-Neustart möglich
-- Optionales **Radio-Status-Embed** (persistent)
+- `/radio start [voice_channel] [preset]`  
+  - Aktiviert das Radio (setzt `isPlaying = true`).
+  - Joint Voice, wenn bereits Hörer im Channel sind.
 
----
+- `/radio stop`  
+  - Deaktiviert Radio (`isPlaying = false`) und verlässt den Channel.
 
-## 🛟 Support & Tickets
+- `/radio set-stream [preset/url]`  
+  - Aktualisiert Stream-URL (oder nutzt Preset aus `music.presets`).
+  - Speichert URL in der DB, sodass nach Neustart dieselbe Quelle genutzt wird.
 
-### 🎫 Ticket-System
+- `/radio volume percent:<0-200>`  
+  - Setzt Lautstärke in Prozent.
+  - Volume wird in der DB persistiert (per Guild).
 
-- Ticket-Panel in `#tickets` (persistent):
-  - Embed „Support & Tickets“
-  - Button „Ticket eröffnen“
-- Beim Klick:
-  - Erstellung eines privaten Ticket-Channels / -Threads
-  - Berechtigungen:
-    - Ticket-Ersteller
-    - Rollen `Support`, `Moderator`, `Admin`
-- Geplante Commands:
-  - `/ticket open`
-  - `/ticket claim`
-  - `/ticket add`
-  - `/ticket remove`
-  - `/ticket close`
+- `/radio status`  
+  - Zeigt aktuellen Status als Embed (läuft/nicht, Channel, Stream, Uptime, Listener, Volume).
+
+**Status-Panel:**  
+`radio_status` im Info-Channel wird automatisch aktualisiert bei:
+
+- `/radio`-Commands.
+- Voice-Events (Join/Leave im Musik-Channel).
+- Bot-Start (`ready` Event).
 
 ---
 
-### 📄 HTML-Transcripts
+## Support & Tickets
 
-Beim Schließen eines Tickets:
+### Ticket-System
 
-1. Alle Nachrichten im Ticket werden gesammelt.
-2. Es wird ein **HTML-Transkript** generiert (User, Zeit, Inhalt, Attachments als Links).
-3. In `#ticket-archive` wird gepostet:
-   - Embed mit Meta-Infos (Ticket-ID, Ersteller, Dauer, Supporter)
-   - HTML-Datei als Attachment
+- Ticket-Datenmodell in MongoDB (`Tickets`):
+  - `id`, `guildId`, `channelId`, `creatorId`, `assignedSupportId?`.
+  - `status: "open" | "in_progress" | "closed"`.
+  - `topic?`, `tags?`, `createdAt`, `closedAt?`, `transcriptUrl?`.
 
-Der Ticket-Status (`open` / `closed`) wird in der Datenbank gespeichert.
+**Panel & Eröffnung**
 
----
+- `/ticket panel`:
+  - Setzt das persistente `tickets_panel` mit einem „Ticket eröffnen“-Button.
+- Button `ticket_open` oder `/ticket open [topic]`:
+  - Erstellt Ticket-Channel in konfigurierter Kategorie.
+  - Permissions: Ersteller + Support/Admin, Rest ohne Sicht.
+  - Ticket-Dokument wird in der DB angelegt.
+  - Start-Embed im Ticket-Channel + Logging im Support-Log.
 
-### 📊 Support-Log & Voice-Support-Queue
+**Ticket-Commands**
 
-**Support-Log (`#support-log`):**
+- `/ticket claim` – Ticket übernehmen (`assignedSupportId` setzen).
+- `/ticket add @User/@Role` – Berechtigungen ergänzen.
+- `/ticket remove @User/@Role` – Berechtigungen entfernen.
+- `/ticket close [reason]` – Ticket schließen:
+  - Lädt alle Nachrichten über die API.
+  - Generiert ein **HTML-Transcript** mit modernem Dark-UI:
+    - Karten pro Nachricht (Avatar, Tag, Zeit, Inhalt, Attachments).
+    - Meta-Block (Ticket-ID, Guild, Channel, Ersteller, Bearbeiter, Dauer).
+  - Postet HTML als Datei im Ticket-Archive-Channel (+ Embed mit Metadaten).
+  - Speichert `transcriptUrl` im Ticket-Dokument.
+  - Schließt/entfernt den Ticket-Channel.
 
-- Ticket erstellt / übernommen / geschlossen
-- Wichtige Statusänderungen und Eskalationen
+### Voice-Support-Queue
 
-**Voice-Support-Queue:**
+- Warteschlange pro Guild (`SupportQueueService`), FIFO, in Memory.
+- Konfiguration:
+  - `supportQueue.queueVoiceChannelId`
+  - `supportQueue.supportVoiceChannelIds[]`
+  - `supportQueue.statusMessageChannelId?` (optional Panel).
 
-- Warte-Channel `support-queue`
-- Mehrere Support-Voice-Channels (`Support 1–3`)
-- Ablauf:
-  - User joint `support-queue` → landet in einer Warteschlange (DB)
-  - Supporter joint freien Support-Channel → erster wartender User wird automatisch verschoben
-- Commands:
-  - `/supportqueue status`
-  - `/supportqueue clear`
-- Optionales **Support-Queue-Status-Embed** (persistent)
+**Verhalten (Voice-Events):**
 
----
+- User joint `queueVoiceChannel`:
+  - Wird zur Queue hinzugefügt.
+  - Optional DM + Log in Support-Log.
+- Supporter joint einen Support-Voice:
+  - Nächster User aus der Queue wird in diesen Channel gezogen.
+  - Logging im Support-Log.
+- User verlässt Queue:
+  - Wird aus Queue entfernt.
 
-## 🎉 Community
+**Commands (`/supportqueue`):**
 
-### 🎁 Giveaways
+- `status` – aktuelle Queue anzeigen (Embed).
+- `clear` – Queue leeren (Staff-only).
 
-- Verwaltung in `#giveaways` über Slash-Commands:
-  - `/giveaway create`
-  - `/giveaway end`
-  - `/giveaway reroll`
-- Teilnahme per Button (kein Reaction-Spam)
-- Teilnehmer werden in einer DB gespeichert, Gewinner per Zufall gezogen
-- Optional:
-  - **Giveaway-Info-Panel** (persistent), das erklärt, wie das System funktioniert
+**Status-Panel (`support_queue_status`):**
 
----
-
-## 🧪 Studio Projects / GitHub
-
-### 📂 Projektindex
-
-- GitHub-Integration für das Profil **`PixelGG`**
-- **Projektindex-Embed** in `#project-index`:
-  - Auflistung aller getrackten Repositories
-  - Profil-Readme-Repo (Repo mit gleichem Namen wie der User) ist explizit ausgeschlossen
-  - Zeigt u. a.:
-    - Repo-Name → Link
-    - Kurzbeschreibung
-    - Letzte Aktivität
-
-- Aktualisierung über:
-  - GitHub-Webhooks (Push, Releases, Issues, Pull Requests) oder
-  - periodische API-Polls
-
-> Das Projektindex-Embed ist **persistent** und wird nur editiert, nicht ständig neu gepostet.
+- Optionales Dashboard im konfigurierten Channel, via Persistent-Embed-Service gepflegt.
 
 ---
 
-## 🛠 Team (Staff)
+## Community: Giveaways
 
-### 📣 Staff Announcements
+- Mongo-Collection `Giveaways`:
+  - `id`, `guildId`, `channelId`, `messageId`, `prize`, `winnerCount`, `hostId`.
+  - `status: "running" | "ended"`, `endAt`, `participants: string[]`.
 
-- Interne Ankündigungen via `/staffannounce create` in `#staff-announcements`
-- Nur für definierte Staff-Rollen (`Owner`, `Admin`, `Dev Lead`, …)
+**Commands (`/giveaway`):**
 
----
+- `panel` – erklärt Giveaways im `giveaways`-Channel (persistent `giveaway_panel`).  
+- `create` – neues Giveaway mit Button „Teilnehmen“.
+- `end` – laufendes Giveaway beenden, Gewinner auslosen und anzeigen.
+- `reroll` – neuen Gewinner für ein beendetes Giveaway ziehen.
 
-### 📋 Standup
-
-- `/standup start` generiert eine Standup-Nachricht in `#standup`
-- Optional:
-  - Buttons/Modals für strukturierte Antworten
-- Antworten können in einer DB gespeichert und später ausgewertet werden
-
----
-
-### 🚨 Mod-Queue & Audit-Log
-
-**Mod-Queue (`#mod-queue`):**
-
-- `/report user @User <Grund>` erzeugt ein Report-Embed:
-  - Gemeldeter User
-  - Melder
-  - Grund
-  - Link zur Original-Nachricht
-- Optional: Claim-Funktion für Moderatoren
-
-**Audit-Log (`#audit-log`):**
-
-- Spiegel wichtiger Audit-Events:
-  - Bans, Kicks
-  - Role-Changes (v. a. Staff-Rollen)
-  - Channel-Erstellungen / -Löschungen
-  - Weitere relevante Moderationsaktionen
+Teilnahme wird über Button-Toggle (join/leave) geregelt; Giveaways werden bei Bot-Start automatisch fortgesetzt/abgeschlossen.
 
 ---
 
-## 🛡 Archive & Security
+## Studio Projects / GitHub
 
-**Join/Leave-Log (`#join-leave-log`):**
+### GitHub-Projektindex
 
-- Embeds bei Join & Leave:
-  - User, ID, Account-Alter
-  - Optional: verwendeter Invite
+- Service `GithubService` pollt regelmäßig die GitHub-API:
+  - User-Name und Filter aus Config (`github.username`, `ignoredRepos`, `trackAllPublicRepos`, `trackedRepos`).
+  - Speichert Repos in Mongo (`Repositories`).
+- Persistent-Panel `project_index_main` im Project-Index-Channel:
+  - Liste der zuletzt aktiven Repos (Name, Link, letzte Aktivität).
 
-**AutoMod-Log (`#automod-log`):**
+**Commands (`/github`):**
 
-- Automatische Moderations-Events:
-  - Spam, Links, Schimpfwörter, Mass-Mentions usw.
-  - Maßnahme: Warn, Mute, Kick, Ban
+- `sync` – manuelles Refresh des Projektindex (Staff-only).
 
-**Ticket-Archive (`#ticket-archive`):**
+### Polling
 
-- Pro Ticket:
-  - Embed mit Ticket-Metadaten
-  - HTML-Transkript als Datei-Anhang
+- Intervall über `github.pollingIntervalMinutes` (Standard: 60 Minuten).
+- Zusätzlich initialer Sync beim Bot-Start.
 
 ---
 
-## 🧱 Persistent-Embed-System
+## Team (Staff) & Logs
 
-Ein Kern-Feature des Bots ist das **Single-Embed-/Persistent-Embed-System**, das alle statischen Panels verwaltet.
+### Staff & Public Announcements
 
-### Idee
+- `/staffannounce create`:
+  - Interne Staff-Ankündigungen im `staffAnnouncements`-Channel.
+  - Nur Owner/Admin/DevLead (und Manage Guild).
+- `/announce create`:
+  - Öffentliche Ankündigungen im `announcements`-Channel.
+  - Titel, Text, optional Bild/Thumbnail, optional Ping-Rolle.
 
-Für jeden statischen Bereich gibt es einen eindeutigen **Key**, z. B.:
+### Standup
+
+- `/standup start` – Startet ein Standup im `standup`-Channel (Button → Modal).
+- Nutzer füllen Modal aus (Gestern/Heute/Blocker); Einträge werden in Mongo gespeichert (`StandupEntries`).
+- `/standup summary [date]` – Zusammenfassung für einen Tag (Embed mit Antworten).
+
+### Mod-Queue & Reports
+
+- `/report user @User <Grund> [message_link]`:
+  - Erstellt ein Report-Embed im `modQueue`-Channel (gemeldeter User, Melder, Grund, Link).
+
+### Logging
+
+`LoggingService` schreibt in die konfigurierten Log-Channels:
+
+- Join/Leave → `joinLeaveLog`.
+- AutoMod-Events → `automodLog`.
+- Audit-Events → `auditLog`.
+- Support-/Ticket-Events → `supportLog`.
+- Ticket-Archive → `ticketArchive` (mit HTML-Dateien als Attachments).
+
+---
+
+## Persistent-Embed-System
+
+Zentrales System für alle statischen Panels/Status-Overviews.
+
+**Keys (Beispiele):**
 
 - `rules_main`
 - `info_main`
@@ -301,54 +275,115 @@ Für jeden statischen Bereich gibt es einen eindeutigen **Key**, z. B.:
 - `project_index_main`
 - `giveaway_panel`
 
-Pro Kombination `guildId + key` speichert die DB:
+**Datenmodell (`PersistentMessages`):**
 
-- `channelId`
-- `messageId`
-- `createdAt`
-- `updatedAt`
-- optional Meta-Daten
+- `guildId`, `key`
+- `channelId`, `messageId`
+- `createdAt`, `updatedAt`
+- optional `meta`
 
-### Verhalten
+**Verhalten (`PersistentMessageService`):**
 
-- Beim Rendern eines Panels wird eine Funktion wie  
-  `ensurePersistentEmbed(key, channelId, renderFn)` verwendet.
-- Ablauf:
-  1. Versuch, die bestehende Nachricht via `messageId` zu holen
-  2. Falls vorhanden → `message.edit(renderFn())`
-  3. Falls nicht vorhanden → `channel.send(renderFn())` + neue `messageId` speichern
+- `ensurePersistentMessage(guildId, key, channelId, renderFn)`:
+  - Wenn DB-Eintrag vorhanden → versucht `message.edit(...)`, sonst `channel.send(...)` + Update.
+  - Wenn kein Eintrag → sendet neue Message + Eintrag anlegen.
+- `updatePersistentMessage(guildId, key, renderFn)` analog, ohne Channel-Wechsel.
 
-> So bleibt pro Panel **immer genau eine Message** im Channel. Änderungen werden nur über `edit` eingespielt.
-
-### Wird genutzt für
-
-- Rules
-- Info
-- Rollen-Panel
-- Ticket-Panel
-- (Optional) Support-Queue-Status
-- (Optional) Radio-Status
-- Projektindex (GitHub)
-- (Optional) Giveaway-Info
+Damit bleibt pro Panel **immer genau eine Message** im Channel; Änderungen laufen ausschließlich über `edit`.
 
 ---
 
-## 📁 Projektstruktur (geplant)
+## Projektstruktur
 
 ```text
 arvox-studio-bot/
-├─ src/
-│  ├─ commands/          # Slash-Commands (roles, tickets, radio, github, giveaways, staff, ...)
-│  ├─ events/            # Discord-Events (ready, interactionCreate, guildMemberAdd, voiceStateUpdate, ...)
-│  ├─ services/          # TicketService, RadioService, GithubService, PersistentMessageService, ...
-│  ├─ config/            # interne Konfiguration, Mapping Keys -> Channels/Rollen
-│  ├─ types/             # eigene Typdefinitionen/Interfaces
-│  └─ index.ts           # Einstiegspunkt
-├─ config/
-│  └─ default.json       # Guild-spezifische Settings (Channel/Rollen-IDs, Feature-Flags)
-├─ db/ oder prisma/      # Datenbankschema/Migrations (je nach DB)
-├─ .env.example          # Beispiel für ENV-Variablen (TOKEN, DB_URI, ...)
-├─ .gitignore
-├─ package.json
-├─ tsconfig.json
-└─ README.md
+  src/
+    commands/          # Slash-Commands (admin, tickets, radio, giveaways, supportqueue, github, ...)
+    events/            # Discord-Events (ready, interactionCreate, guildMemberAdd, voiceStateUpdate, ...)
+    services/          # Business-Logik (TicketService, RadioService, GithubService, PersistentMessageService, ...)
+    config/            # Konfiguration (default.json, Loader)
+    db/                # Mongo-Models (Tickets, Giveaways, PersistentMessages, RadioState, Repositories, StandupEntries)
+    types/             # Eigene Typdefinitionen/Interfaces
+    utils/             # Command-Loader, Hilfsfunktionen
+    index.ts           # Einstiegspunkt
+  .env.example         # ENV-Beispiele (DISCORD_TOKEN, DATABASE_URL, ...)
+  package.json
+  tsconfig.json
+  README.md
+```
+
+---
+
+## Setup (Entwicklung)
+
+1. Dependencies installieren:
+
+   ```bash
+   npm install
+   ```
+
+2. `.env` erstellen (auf Basis von `.env.example`):
+
+   ```env
+   DISCORD_TOKEN=DEIN_DEV_BOT_TOKEN
+   DISCORD_CLIENT_ID=DEINE_APP_ID
+   DISCORD_GUILD_ID=DEINE_DEV_GUILD_ID
+
+   DATABASE_URL=mongodb://localhost:27017/arvox-studio-bot
+
+   GITHUB_USERNAME=PixelGG
+   GITHUB_TOKEN=   # optional
+   PORT=3000
+   ```
+
+3. Config anpassen (`src/config/default.json`):
+
+   - Guild-ID.
+   - Channel-IDs.
+   - Role-IDs.
+   - Feature-Flags (music, github, supportQueue, ...).
+
+4. Dev-Start:
+
+   ```bash
+   npm run dev
+   ```
+
+   Der Bot deployed die Guild-Commands automatisch und loggt sich ein.
+
+---
+
+## Build & Deployment
+
+1. Produktions-Build erzeugen:
+
+   ```bash
+   npm run build
+   ```
+
+2. Auf Server übertragen (z. B. via Git oder Datei-Kopie):
+
+   ```text
+   /opt/arvox-studio-bot/
+     package.json
+     dist/
+       index.js
+       ...
+   ```
+
+3. Auf dem Server:
+
+   ```bash
+   cd /opt/arvox-studio-bot
+   npm install --omit=dev
+   # .env mit Produktionswerten anlegen
+   node dist/index.js
+   ```
+
+4. Optional mit Prozess-Manager (z. B. `pm2`) betreiben.
+
+---
+
+## Lizenz
+
+Dieses Projekt verwendet die Lizenz aus der Datei `LICENSE` im Repository-Root.*** End Patch```}()
