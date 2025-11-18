@@ -20,6 +20,11 @@ const command: SlashCommand = {
     .setDescription('24/7 Radio im Voice-Channel steuern')
     .addSubcommand((sub) =>
       sub
+        .setName('panel')
+        .setDescription('Radio-Status-Panel im Info-Channel posten/aktualisieren')
+    )
+    .addSubcommand((sub) =>
+      sub
         .setName('start')
         .setDescription('Radio im Voice-Channel starten')
         .addChannelOption((opt) =>
@@ -130,7 +135,23 @@ const command: SlashCommand = {
       return;
     }
 
-    if (sub === 'start') {
+    if (sub === 'panel') {
+      await PersistentMessageService.ensurePersistentMessage(
+        interaction.client,
+        guildId,
+        'radio_status',
+        guildConfig.channels.info,
+        () => {
+          const embed = RadioService.getStatusEmbed(interaction.guild!, config);
+          return { embeds: [embed] };
+        }
+      );
+
+      await interaction.reply({
+        content: 'Radio-Status-Panel wurde im Info-Channel gepostet/aktualisiert.',
+        ephemeral: true
+      });
+    } else if (sub === 'start') {
       const channelOption = interaction.options.getChannel('voice_channel') as VoiceChannel | null;
       const preset = interaction.options.getString('preset');
 
@@ -219,3 +240,4 @@ const command: SlashCommand = {
 };
 
 export default command;
+
