@@ -32,6 +32,43 @@ const command: SlashCommand = {
             .setDescription('Optionale Rolle zum Pingen')
             .setRequired(false)
         )
+        // bis zu 3 optionale Felder
+        .addStringOption((opt) =>
+          opt
+            .setName('field1_name')
+            .setDescription('Titel für Feld 1')
+            .setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('field1_value')
+            .setDescription('Inhalt für Feld 1')
+            .setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('field2_name')
+            .setDescription('Titel für Feld 2')
+            .setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('field2_value')
+            .setDescription('Inhalt für Feld 2')
+            .setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('field3_name')
+            .setDescription('Titel für Feld 3')
+            .setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt
+            .setName('field3_value')
+            .setDescription('Inhalt für Feld 3')
+            .setRequired(false)
+        )
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
   guildOnly: true,
@@ -86,6 +123,18 @@ const command: SlashCommand = {
       })
       .setFooter({ text: `Von ${interaction.user.tag}` })
       .setTimestamp(new Date());
+
+    const fields: { name: string; value: string; inline?: boolean }[] = [];
+    for (let i = 1; i <= 3; i += 1) {
+      const nameOpt = interaction.options.getString(`field${i}_name`);
+      const valueOpt = interaction.options.getString(`field${i}_value`);
+      if (nameOpt && valueOpt) {
+        fields.push({ name: nameOpt, value: valueOpt, inline: false });
+      }
+    }
+    if (fields.length > 0) {
+      embed.addFields(fields);
+    }
 
     const content = pingRole ? `<@&${pingRole.id}>` : undefined;
 
