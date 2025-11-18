@@ -39,6 +39,10 @@ export class RadioService {
     return config.guilds[guildId];
   }
 
+  static getSession(guildId: string): RadioSession | undefined {
+    return this.sessions.get(guildId);
+  }
+
   static async start(
     client: Client,
     guildId: string,
@@ -204,6 +208,18 @@ export class RadioService {
     this.sessions.clear();
   }
 
+  static disconnectGuild(guildId: string): void {
+    const session = this.sessions.get(guildId);
+    if (!session) return;
+    try {
+      session.player.stop();
+      session.connection.destroy();
+    } catch {
+      // ignore cleanup errors
+    }
+    this.sessions.delete(guildId);
+  }
+
   static async resumeFromState(client: Client, config: AppConfig): Promise<void> {
     const states = await RadioStateModel.find({ isPlaying: true }).exec();
 
@@ -211,7 +227,23 @@ export class RadioService {
       if (!config.guilds[state.guildId]) {
         continue;
       }
+
       try {
+        const guild = await client.guilds.fetch(state.guildId);
+        const channel = (await guild.channels.fetch(
+          state.voiceChannelId
+        )) as VoiceBasedChannel | null;
+
+        if (!channel || !channel.isVoiceBased()) {
+          continue;
+        }
+
+        const nonBotListeners = channel.members.filter((m) => !m.user.bot).size;
+        if (nonBotListeners === 0) {
+          // Nobody is listening right now; keep state but don't auto-join.
+          continue;
+        }
+
         await this.start(
           client,
           state.guildId,
@@ -220,7 +252,7 @@ export class RadioService {
           state.volumePercent
         );
       } catch {
-        // ignore errors for invalid channels/streams during resume
+        // ignore errors for invalid guilds/channels during resume
       }
     }
   }
