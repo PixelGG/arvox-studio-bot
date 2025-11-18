@@ -7,6 +7,7 @@ import { connectDatabase } from './db/connection';
 import { registerEvents } from './events';
 import { CommandDeployer } from './services/CommandDeployer';
 import { loadSlashCommands } from './utils/commandLoader';
+import { startWebServer } from './web/server';
 import { RadioService } from './services/RadioService';
 
 declare module 'discord.js' {
@@ -47,6 +48,9 @@ async function bootstrap() {
 
   const deployer = new CommandDeployer(appConfig);
   await deployer.registerGuildCommands(commands);
+
+  // Start the lightweight web server for the embed editor
+  startWebServer(client, appConfig);
 
   const handleShutdown = async (reason: string) => {
     // eslint-disable-next-line no-console
