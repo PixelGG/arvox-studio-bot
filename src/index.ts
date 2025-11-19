@@ -6,7 +6,7 @@ import type { ChildProcessWithoutNullStreams } from 'child_process';
 const LOG_DIR = path.resolve(__dirname, '..', 'logs');
 const LOG_FILE = path.join(LOG_DIR, 'bot.log');
 const RESTART_DELAY_MS = 5000;
-const MAX_RESTARTS = 10;
+const MAX_RESTARTS = 15;
 const RESTART_WINDOW_MS = 60_000;
 
 if (!fs.existsSync(LOG_DIR)) {
@@ -64,19 +64,21 @@ function startBot() {
 
   log('Starte Bot-Prozess ...');
 
-  botProcess = spawn(process.execPath, [path.join(__dirname, 'bot.js')], {
-    stdio: ['inherit', 'pipe', 'pipe'],
+  const child = spawn(process.execPath, [path.join(__dirname, 'bot.js')], {
+    stdio: ['pipe', 'pipe', 'pipe'],
     env: process.env
-  });
+  }) as ChildProcessWithoutNullStreams;
 
-  pipeOutput(botProcess.stdout, 'BOT');
-  pipeOutput(botProcess.stderr, 'BOT-ERR', true);
+  botProcess = child;
 
-  botProcess.on('error', (error) => {
+  pipeOutput(child.stdout, 'BOT');
+  pipeOutput(child.stderr, 'BOT-ERR', true);
+
+  child.on('error', (error) => {
     log(`Fehler beim Starten des Bot-Prozesses: ${error.message}`);
   });
 
-  botProcess.on('exit', (code, signal) => {
+  child.on('exit', (code, signal) => {
     botProcess = null;
 
     if (stopping) {
@@ -113,4 +115,3 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 log('Bot-Supervisor gestartet.');
 startBot();
-
