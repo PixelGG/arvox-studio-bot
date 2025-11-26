@@ -6,10 +6,17 @@ import { RepositoryModel } from '../db/models/Repository';
 import { PersistentMessageService } from './PersistentMessageService';
 
 export class GithubService {
-  static async syncRepositories(client: Client, config: AppConfig): Promise<void> {
-    const guildConfig = config.guilds[config.defaultGuildId];
-    if (!guildConfig) return;
+  static async syncRepositories(client: Client, config: AppConfig, targetGuildId?: string): Promise<void> {
+    const guilds = Object.values(config.guilds).filter((g) =>
+      targetGuildId ? g.id === targetGuildId : true
+    );
 
+    for (const guildConfig of guilds) {
+      await this.syncGuild(client, config, guildConfig);
+    }
+  }
+
+  private static async syncGuild(client: Client, config: AppConfig, guildConfig: GuildConfig): Promise<void> {
     const repos = await this.fetchRepos(guildConfig);
 
     const activeRepoIds = new Set<number>();
@@ -78,10 +85,8 @@ export class GithubService {
   }
 
   static async startPolling(client: Client, config: AppConfig): Promise<void> {
-    const guildConfig = config.guilds[config.defaultGuildId];
-    if (!guildConfig) return;
-
-    const intervalMinutes = guildConfig.github.pollingIntervalMinutes || 60;
+    const intervalMinutes =
+      config.guilds[config.defaultGuildId]?.github.pollingIntervalMinutes || 60;
     const intervalMs = intervalMinutes * 60 * 1000;
 
     // initial sync
@@ -136,4 +141,3 @@ export class GithubService {
     });
   }
 }
-

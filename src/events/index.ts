@@ -7,6 +7,8 @@ import guildMemberAdd from './guildMemberAdd';
 import guildMemberRemove from './guildMemberRemove';
 import voiceStateUpdate from './voiceStateUpdate';
 import messageCreate from './messageCreate';
+import messageReactionAdd from './messageReactionAdd';
+import messageReactionRemove from './messageReactionRemove';
 
 const events: DiscordEvent[] = [
   ready,
@@ -14,7 +16,9 @@ const events: DiscordEvent[] = [
   guildMemberAdd,
   guildMemberRemove,
   voiceStateUpdate,
-  messageCreate
+  messageCreate,
+  messageReactionAdd,
+  messageReactionRemove
 ];
 
 export async function registerEvents(client: Client, config: AppConfig): Promise<void> {
@@ -30,4 +34,3 @@ export async function registerEvents(client: Client, config: AppConfig): Promise
     }
   }
 }
-

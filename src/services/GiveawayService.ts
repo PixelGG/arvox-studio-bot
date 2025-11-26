@@ -9,6 +9,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'disc
 import { nanoid } from 'nanoid';
 import type { AppConfig, GuildConfig } from '../types/config';
 import { GiveawayModel } from '../db/models/Giveaway';
+import { GiveawayHistoryModel } from '../db/models/GiveawayHistory';
 
 interface GiveawayTimer {
   timeout: NodeJS.Timeout;
@@ -199,6 +200,19 @@ export class GiveawayService {
         : 'Kein Gewinner, zu wenige Teilnehmer.',
       ephemeral: true
     });
+
+    await GiveawayHistoryModel.create({
+      giveawayId: giveaway.id,
+      guildId: giveaway.guildId,
+      channelId: giveaway.channelId,
+      messageId: giveaway.messageId,
+      prize: giveaway.prize,
+      winnerCount: giveaway.winnerCount,
+      winners,
+      participants: giveaway.participants.length,
+      endedAt: new Date(),
+      action: 'reroll'
+    });
   }
 
   static async resumeRunningGiveaways(client: Client): Promise<void> {
@@ -262,6 +276,19 @@ export class GiveawayService {
       });
     }
 
+    await GiveawayHistoryModel.create({
+      giveawayId: giveaway.id,
+      guildId: giveaway.guildId,
+      channelId: giveaway.channelId,
+      messageId: giveaway.messageId,
+      prize: giveaway.prize,
+      winnerCount: giveaway.winnerCount,
+      winners,
+      participants: giveaway.participants.length,
+      endedAt: new Date(),
+      action: 'end'
+    });
+
     return true;
   }
 
@@ -278,4 +305,3 @@ export class GiveawayService {
     return winners;
   }
 }
-

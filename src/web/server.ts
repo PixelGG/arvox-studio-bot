@@ -3,6 +3,7 @@ import type { Client, TextChannel } from 'discord.js';
 import { ChannelType, EmbedBuilder } from 'discord.js';
 import type { AppConfig } from '../types/config';
 import { EmbedSessionService } from '../services/EmbedSessionService';
+import { EmbedDefinitionService } from '../services/EmbedDefinitionService';
 
 export function startWebServer(client: Client, _config: AppConfig): void {
   const app = express();
@@ -195,9 +196,296 @@ export function startWebServer(client: Client, _config: AppConfig): void {
     }
   });
 
-  app.listen(port, () => {
-    // already logged above
+  // --- Persistent embed definitions: backend endpoints for dashboard/API ---
+  app.put('/api/embeds/:guildId/:key', async (req, res) => {
+    const { guildId, key } = req.params;
+    const { channelId, embed, components } = req.body as {
+      channelId?: string;
+      embed?: Record<string, unknown>;
+      components?: Record<string, unknown>[];
+    };
+
+    if (!guildId || !key || !channelId || !embed) {
+      res.status(400).json({ error: 'missing_required_fields' });
+      return;
+    }
+
+    try {
+      const def = await EmbedDefinitionService.upsertDefinition({
+        guildId,
+        key,
+        channelId,
+        embedPayload: embed,
+        components
+      });
+      await EmbedDefinitionService.syncDefinition(client, guildId, key);
+      res.json({ ok: true, definition: def });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in PUT /api/embeds:', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
   });
+
+  // --- Module manager endpoints ---
+  app.get('/api/modules/:guildId', async (req, res) => {
+    const { guildId } = req.params;
+    try {
+      const defs = await EmbedDefinitionService.getDefinition(guildId, 'dummy').catch(() => null); // no-op to ensure connection
+      const [moduleDefs, guildModules] = await Promise.all([
+        import('../services/ModuleService').then((m) => m.ModuleService.listDefinitions()),
+        import('../services/ModuleService').then((m) => m.ModuleService.getGuildModules(guildId))
+      ]);
+      res.json({ definitions: moduleDefs, guildModules });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in GET /api/modules/:guildId', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.put('/api/modules/:guildId/:moduleKey', async (req, res) => {
+    const { guildId, moduleKey } = req.params;
+    const { enabled, settings } = req.body as {
+      enabled: boolean;
+      settings?: Record<string, unknown>;
+    };
+
+    if (enabled === undefined) {
+      res.status(400).json({ error: 'enabled_required' });
+      return;
+    }
+
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      const doc = await service.setGuildModuleState(guildId, moduleKey, enabled, settings);
+      res.json({ ok: true, module: doc });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in PUT /api/modules/:moduleKey', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  // Permission profiles
+  app.get('/api/permissions/:guildId/profiles', async (req, res) => {
+    const { guildId } = req.params;
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      const profiles = await service.listPermissionProfiles(guildId);
+      res.json({ profiles });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in GET /api/permissions/:guildId/profiles', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.put('/api/permissions/:guildId/profiles/:profileKey', async (req, res) => {
+    const { guildId, profileKey } = req.params;
+    const { label, roleIds, actions } = req.body as {
+      label: string;
+      roleIds: string[];
+      actions: Record<string, string[]>;
+    };
+
+    if (!label || !Array.isArray(roleIds)) {
+      res.status(400).json({ error: 'invalid_payload' });
+      return;
+    }
+
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      const doc = await service.upsertPermissionProfile({
+        guildId,
+        profileKey,
+        label,
+        roleIds,
+        actions: actions ?? {}
+      });
+      res.json({ ok: true, profile: doc });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in PUT /api/permissions/:guildId/profiles/:profileKey', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.delete('/api/permissions/:guildId/profiles/:profileKey', async (req, res) => {
+    const { guildId, profileKey } = req.params;
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      await service.deletePermissionProfile(guildId, profileKey);
+      res.json({ ok: true });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in DELETE /api/permissions/:guildId/profiles/:profileKey', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  // Config profiles
+  app.get('/api/config-profiles/:guildId', async (req, res) => {
+    const { guildId } = req.params;
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      const profiles = await service.listConfigProfiles(guildId);
+      res.json({ profiles });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in GET /api/config-profiles/:guildId', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.post('/api/config-profiles/:guildId', async (req, res) => {
+    const { guildId } = req.params;
+    const { name, description, snapshot, isActive } = req.body as {
+      name: string;
+      description?: string;
+      snapshot: Record<string, unknown>;
+      isActive?: boolean;
+    };
+
+    if (!name || !snapshot) {
+      res.status(400).json({ error: 'invalid_payload' });
+      return;
+    }
+
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      const doc = await service.createConfigProfile({ guildId, name, description, snapshot, isActive });
+      res.json({ ok: true, profile: doc });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in POST /api/config-profiles/:guildId', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.post('/api/config-profiles/:guildId/:name/activate', async (req, res) => {
+    const { guildId, name } = req.params;
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      await service.activateConfigProfile(guildId, name);
+      res.json({ ok: true });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in POST /api/config-profiles/:guildId/:name/activate', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.delete('/api/config-profiles/:guildId/:name', async (req, res) => {
+    const { guildId, name } = req.params;
+    try {
+      const service = (await import('../services/ModuleService')).ModuleService;
+      await service.deleteConfigProfile(guildId, name);
+      res.json({ ok: true });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in DELETE /api/config-profiles/:guildId/:name', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  // Analytics summary
+  app.get('/api/analytics/:guildId/summary', async (req, res) => {
+    const { guildId } = req.params;
+    try {
+      const { WarningModel } = await import('../db/models/Warning');
+      const { TicketModel } = await import('../db/models/Ticket');
+      const { JoinLeaveModel } = await import('../db/models/JoinLeave');
+
+      const [warnings, ticketsOpen, ticketsClosed, joins7, leaves7] = await Promise.all([
+        WarningModel.countDocuments({ guildId }),
+        TicketModel.countDocuments({ guildId, status: { $ne: 'closed' } }),
+        TicketModel.countDocuments({ guildId, status: 'closed' }),
+        JoinLeaveModel.countDocuments({
+          guildId,
+          type: 'join',
+          occurredAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        }),
+        JoinLeaveModel.countDocuments({
+          guildId,
+          type: 'leave',
+          occurredAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+        })
+      ]);
+
+      res.json({
+        warnings,
+        tickets: { open: ticketsOpen, closed: ticketsClosed },
+        joins7,
+        leaves7
+      });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in GET /api/analytics/:guildId/summary', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.get('/api/embeds/:guildId/:key', async (req, res) => {
+    const { guildId, key } = req.params;
+    if (!guildId || !key) {
+      res.status(400).json({ error: 'missing_required_fields' });
+      return;
+    }
+
+    try {
+      const def = await EmbedDefinitionService.getDefinition(guildId, key);
+      if (!def) {
+        res.status(404).json({ error: 'not_found' });
+        return;
+      }
+      res.json({ definition: def });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in GET /api/embeds:', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  app.post('/api/embeds/:guildId/:key/sync', async (req, res) => {
+    const { guildId, key } = req.params;
+    if (!guildId || !key) {
+      res.status(400).json({ error: 'missing_required_fields' });
+      return;
+    }
+
+    try {
+      await EmbedDefinitionService.syncDefinition(client, guildId, key);
+      res.json({ ok: true });
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Error in POST /api/embeds/:key/sync:', error);
+      res.status(500).json({ error: 'internal_error' });
+    }
+  });
+
+  try {
+    const server = app.listen(port, () => {
+      // already logged above
+    });
+    server.on('error', (error: any) => {
+      if (error && error.code === 'EADDRINUSE') {
+        // eslint-disable-next-line no-console
+        console.warn(`Embed editor web server not started: port ${port} already in use.`);
+      } else {
+        // eslint-disable-next-line no-console
+        console.error('Web server error:', error);
+      }
+    });
+  } catch (error: any) {
+    // If port is in use, skip starting the web server to avoid crashing the bot
+    if (error && error.code === 'EADDRINUSE') {
+      // eslint-disable-next-line no-console
+      console.warn(`Embed editor web server not started: port ${port} already in use.`);
+    } else {
+      throw error;
+    }
+  }
 }
 
 function getEmbedEditorHtml(code: string): string {

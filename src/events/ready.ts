@@ -5,9 +5,12 @@ import { GithubService } from '../services/GithubService';
 import { GiveawayService } from '../services/GiveawayService';
 import { RadioService } from '../services/RadioService';
 import { PersistentMessageService } from '../services/PersistentMessageService';
+import { EmbedDefinitionService } from '../services/EmbedDefinitionService';
+import { SchedulerService } from '../services/SchedulerService';
+import { ModuleService } from '../services/ModuleService';
 
 const event: DiscordEvent = {
-  name: 'ready',
+  name: 'clientReady',
   once: true,
   async execute(client: Client, config: AppConfig) {
     // eslint-disable-next-line no-console
@@ -16,6 +19,9 @@ const event: DiscordEvent = {
     await GiveawayService.resumeRunningGiveaways(client);
     await GithubService.startPolling(client, config);
     await RadioService.resumeFromState(client, config);
+    await EmbedDefinitionService.syncAll(client);
+    await SchedulerService.start(client, config);
+    await ModuleService.onReady(client);
 
     // Ensure radio_status panel is up to date for all guilds on startup
     for (const [guildId, guildConfig] of Object.entries(config.guilds)) {

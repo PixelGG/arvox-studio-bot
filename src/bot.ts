@@ -9,6 +9,7 @@ import { CommandDeployer } from './services/CommandDeployer';
 import { loadSlashCommands } from './utils/commandLoader';
 import { startWebServer } from './web/server';
 import { RadioService } from './services/RadioService';
+import { SchedulerService } from './services/SchedulerService';
 
 declare module 'discord.js' {
   interface Client {
@@ -56,6 +57,7 @@ async function bootstrap() {
     // eslint-disable-next-line no-console
     console.log(`Shutting down bot (${reason})...`);
     try {
+      SchedulerService.stopAll();
       await RadioService.shutdownAll();
       await client.destroy();
     } catch (error) {
@@ -91,4 +93,3 @@ bootstrap().catch((error) => {
   console.error('Fatal error during bootstrap:', error);
   process.exit(1);
 });
-

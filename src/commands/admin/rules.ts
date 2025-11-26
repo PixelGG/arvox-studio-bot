@@ -8,6 +8,9 @@ import {
 import type { SlashCommand } from '../../types/commands';
 import type { AppConfig, GuildConfig } from '../../types/config';
 import { PersistentMessageService } from '../../services/PersistentMessageService';
+import { RuleAcceptanceModel } from '../../db/models/RuleAcceptance';
+import { AutoRoleRuleModel } from '../../db/models/AutoRoleRule';
+import { LoggingService } from '../../services/LoggingService';
 
 function getGuildConfig(config: AppConfig, guildId?: string | null): GuildConfig | undefined {
   if (!guildId) return undefined;
@@ -86,4 +89,3 @@ const command: SlashCommand = {
 };
 
 export default command;
-

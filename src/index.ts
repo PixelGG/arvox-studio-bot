@@ -57,6 +57,29 @@ function scheduleRestart() {
   }, RESTART_DELAY_MS);
 }
 
+function resolveBotCommand(): { command: string; args: string[] } {
+  const compiledBot = path.join(__dirname, 'bot.js');
+  const tsBot = path.join(__dirname, 'bot.ts');
+
+  if (fs.existsSync(compiledBot)) {
+    return { command: process.execPath, args: [compiledBot] };
+  }
+
+  // Dev fallback: run ts-node on the TypeScript entrypoint
+  const tsNodeBin = path.join(__dirname, '..', 'node_modules', 'ts-node', 'dist', 'bin.js');
+  if (!fs.existsSync(tsNodeBin)) {
+    throw new Error(
+      'ts-node binary not found. Install dev dependencies or build the project before running.'
+    );
+  }
+
+  if (!fs.existsSync(tsBot)) {
+    throw new Error('bot.ts not found. Ensure you are running from the project root.');
+  }
+
+  return { command: process.execPath, args: [tsNodeBin, tsBot] };
+}
+
 function startBot() {
   if (stopping) {
     return;
@@ -64,7 +87,9 @@ function startBot() {
 
   log('Starte Bot-Prozess ...');
 
-  const child = spawn(process.execPath, [path.join(__dirname, 'bot.js')], {
+  const { command, args } = resolveBotCommand();
+
+  const child = spawn(command, args, {
     stdio: ['pipe', 'pipe', 'pipe'],
     env: process.env
   }) as ChildProcessWithoutNullStreams;

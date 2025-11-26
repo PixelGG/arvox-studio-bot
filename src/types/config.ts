@@ -67,6 +67,7 @@ export interface RolesPanelOptionConfig {
 export interface RolesPanelConfig {
   channelId: string;
   options: RolesPanelOptionConfig[];
+  maxSelections?: number;
 }
 
 export interface MusicConfig {
@@ -145,4 +146,3 @@ export interface AppConfig {
 export interface RawConfig {
   guilds: GuildConfig[];
 }
-

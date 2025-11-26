@@ -11,6 +11,9 @@ export type RenderMessageFn =
   | (() => MessageCreateOptions | Promise<MessageCreateOptions>)
   | (() => MessageEditOptions | Promise<MessageEditOptions>);
 
+// In-memory lock to avoid duplicate sends/edits on concurrent calls for the same key
+const inFlight = new Set<string>();
+
 async function fetchTextChannel(
   client: Client,
   guildId: string,
@@ -36,6 +39,11 @@ export class PersistentMessageService {
     channelId: string,
     renderFn: RenderMessageFn
   ): Promise<Message | null> {
+    const lockKey = `${guildId}:${key}`;
+    if (inFlight.has(lockKey)) {
+      return null;
+    }
+    inFlight.add(lockKey);
     const existing = await PersistentMessageModel.findOne({ guildId, key }).exec();
     const payload = await renderFn();
 
@@ -54,12 +62,14 @@ export class PersistentMessageService {
         existing.messageId = message.id;
         existing.channelId = channel.id;
         await existing.save();
+        inFlight.delete(lockKey);
         return message;
       }
     }
 
     const channel = await fetchTextChannel(client, guildId, channelId);
     if (!channel) {
+      inFlight.delete(lockKey);
       return null;
     }
 
@@ -72,6 +82,7 @@ export class PersistentMessageService {
       messageId: message.id
     });
 
+    inFlight.delete(lockKey);
     return message;
   }
 
@@ -105,4 +116,3 @@ export class PersistentMessageService {
     }
   }
 }
-

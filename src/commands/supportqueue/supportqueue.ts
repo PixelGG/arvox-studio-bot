@@ -1,25 +1,24 @@
 import { PermissionFlagsBits, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import type { SlashCommand } from '../../types/commands';
 import { SupportQueueService } from '../../services/SupportQueueService';
+import { LoggingService } from '../../services/LoggingService';
 import type { AppConfig, GuildConfig } from '../../types/config';
+import { ModuleService } from '../../services/ModuleService';
 
 function getGuildConfig(config: AppConfig, guildId?: string | null): GuildConfig | undefined {
   if (!guildId) return undefined;
   return config.guilds[guildId];
 }
 
+const MODULE_KEY = 'tickets';
+
 const command: SlashCommand = {
   data: new SlashCommandBuilder()
     .setName('supportqueue')
     .setDescription('Voice-Support-Warteschlange einsehen und verwalten')
-    .addSubcommand((sub) =>
-      sub.setName('status').setDescription('Aktuelle Warteschlange anzeigen')
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName('clear')
-        .setDescription('Warteschlange leeren (nur Admin/Support)')
-    )
+    .addSubcommand((sub) => sub.setName('status').setDescription('Aktuelle Warteschlange anzeigen'))
+    .addSubcommand((sub) => sub.setName('skip').setDescription('Naechsten Eintrag in der Queue ueberspringen'))
+    .addSubcommand((sub) => sub.setName('clear').setDescription('Warteschlange leeren (nur Admin/Support)'))
     .setDefaultMemberPermissions(PermissionFlagsBits.Connect),
   guildOnly: true,
   async execute(interaction, config: AppConfig) {
@@ -53,7 +52,7 @@ const command: SlashCommand = {
             : queue
                 .map(
                   (entry, index) =>
-                    `${index + 1}. <@${entry.userId}> – seit <t:${Math.floor(
+                    `${index + 1}. <@${entry.userId}> - seit <t:${Math.floor(
                       entry.joinedAt.getTime() / 1000
                     )}:R>`
                 )
@@ -65,36 +64,66 @@ const command: SlashCommand = {
       return;
     }
 
+    // Staff-only from here, but also allow via permission profile tickets.manage_queue
+    const member = interaction.member;
+    const memberRoleIds: string[] =
+      member && 'roles' in member
+        ? Array.from(((member as any).roles?.cache?.keys?.() as Iterable<string> | undefined) ?? [])
+        : [];
+
+    const hasProfilePermission = await ModuleService.memberHasAction(
+      guildId,
+      memberRoleIds,
+      MODULE_KEY,
+      'manage_queue'
+    );
+
+    const staffRoleIds = [
+      guildConfig.roles.support,
+      guildConfig.roles.moderator,
+      guildConfig.roles.admin,
+      guildConfig.roles.owner
+    ];
+
+    const rolesManager = member && 'roles' in member ? (member as any).roles : null;
+    const hasStaffRole =
+      rolesManager != null && staffRoleIds.some((id) => rolesManager.cache.has(id));
+
+    if (!hasStaffRole && !hasProfilePermission) {
+      await interaction.reply({
+        content: 'Dieser Subcommand ist nur fuer Support-/Staff-Rollen verfuegbar.',
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (sub === 'skip') {
+      const next = SupportQueueService.popNext(guildId);
+      await LoggingService.logSupportEvent(
+        interaction.guild,
+        config,
+        'Support-Queue Skip',
+        next
+          ? `Eintrag ${next.userId} wurde aus der Queue entfernt.`
+          : 'Skip ausgefuehrt, aber Queue war leer.'
+      );
+      await interaction.reply({
+        content: next
+          ? `Der naechste Wartende (<@${next.userId}>) wurde aus der Queue entfernt.`
+          : 'Keine Eintraege in der Warteschlange.',
+        ephemeral: true
+      });
+      return;
+    }
+
     if (sub === 'clear') {
-      // Nur Staff darf löschen
-      const member = interaction.member;
-      if (!member || !('roles' in member)) {
-        await interaction.reply({
-          content: 'Fehlende Berechtigung.',
-          ephemeral: true
-        });
-        return;
-      }
-
-      const staffRoleIds = [
-        guildConfig.roles.support,
-        guildConfig.roles.moderator,
-        guildConfig.roles.admin,
-        guildConfig.roles.owner
-      ];
-
-      const rolesManager = 'roles' in member ? (member.roles as any) : null;
-      const hasStaffRole =
-        rolesManager != null && staffRoleIds.some((id) => rolesManager.cache.has(id));
-      if (!hasStaffRole) {
-        await interaction.reply({
-          content: 'Dieser Subcommand ist nur für Support-/Staff-Rollen verfügbar.',
-          ephemeral: true
-        });
-        return;
-      }
-
       SupportQueueService.clearQueue(guildId);
+      await LoggingService.logSupportEvent(
+        interaction.guild,
+        config,
+        'Support-Queue Reset',
+        'Die Warteschlange wurde geleert.'
+      );
       await interaction.reply({
         content: 'Die Support-Warteschlange wurde geleert.',
         ephemeral: true

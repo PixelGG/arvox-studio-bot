@@ -81,6 +81,7 @@
       },
       "rolesPanel": {
         "channelId": "1435907685651578901",
+        "maxSelections": 4,
         "options": [
           {
             "label": "Nova Updates",
@@ -157,4 +158,3 @@
     }
   ]
 }
-

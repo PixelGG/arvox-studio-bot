@@ -67,7 +67,15 @@ const command: SlashCommand = {
           .setCustomId('roles_panel_select')
           .setPlaceholder('Wähle deine Rollen...')
           .setMinValues(0)
-          .setMaxValues(Math.min(25, guildConfig.rolesPanel.options.length))
+          .setMaxValues(
+            Math.max(
+              0,
+              Math.min(
+                25,
+                guildConfig.rolesPanel.maxSelections ?? guildConfig.rolesPanel.options.length
+              )
+            )
+          )
           .addOptions(
             guildConfig.rolesPanel.options.map((option) => ({
               label: option.label,

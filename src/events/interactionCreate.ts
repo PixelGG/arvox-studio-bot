@@ -129,6 +129,31 @@ async function handleButtonInteraction(
     }
 
     await member.roles.add(rolesToAdd);
+
+    const { RuleAcceptanceModel } = await import('../db/models/RuleAcceptance');
+    const { AutoRoleRuleModel } = await import('../db/models/AutoRoleRule');
+
+    await RuleAcceptanceModel.findOneAndUpdate(
+      { guildId: interaction.guildId, userId: interaction.user.id },
+      { guildId: interaction.guildId, userId: interaction.user.id, acceptedAt: new Date() },
+      { upsert: true }
+    ).exec();
+
+    if (interaction.guild) {
+      const autoRules = await AutoRoleRuleModel.find({
+        guildId: interaction.guildId,
+        condition: 'after_accept',
+        enabled: true
+      }).exec();
+
+      for (const rule of autoRules) {
+        const role = interaction.guild.roles.cache.get(rule.roleId);
+        if (role && !member.roles.cache.has(role.id)) {
+          await member.roles.add(role).catch(() => null);
+        }
+      }
+    }
+
     await interaction.reply({
       content: 'Regeln akzeptiert. Rollen wurden vergeben.',
       ephemeral: true
@@ -183,6 +208,14 @@ async function handleSelectMenuInteraction(
 
   const member = interaction.member as GuildMember;
   const selected = new Set(interaction.values);
+  const max = guildConfig.rolesPanel.maxSelections ?? guildConfig.rolesPanel.options.length;
+  if (selected.size > max) {
+    await interaction.reply({
+      content: `Du darfst maximal ${max} Rollen auswählen.`,
+      ephemeral: true
+    });
+    return;
+  }
 
   const added: string[] = [];
   const removed: string[] = [];
@@ -219,6 +252,9 @@ async function handleModalSubmit(
 ): Promise<void> {
   if (interaction.customId === 'standup_modal') {
     await StandupService.handleStandupModalSubmit(interaction);
+  }
+  if (interaction.customId === 'onboarding_modal') {
+    await (await import('../services/OnboardingService')).OnboardingService.handleSubmit(interaction);
   }
 }
 

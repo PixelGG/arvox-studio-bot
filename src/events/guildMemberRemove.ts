@@ -1,6 +1,7 @@
 import type { GuildMember, PartialGuildMember } from 'discord.js';
 import type { DiscordEvent } from '../types/events';
 import { LoggingService } from '../services/LoggingService';
+import { JoinLeaveModel } from '../db/models/JoinLeave';
 
 const event: DiscordEvent = {
   name: 'guildMemberRemove',
@@ -11,6 +12,12 @@ const event: DiscordEvent = {
     if (!user || !guild) return;
 
     await LoggingService.logMemberLeave(user, guild, config);
+    await JoinLeaveModel.create({
+      guildId: guild.id,
+      userId: user.id,
+      type: 'leave',
+      occurredAt: new Date()
+    }).catch(() => null);
   }
 };
 

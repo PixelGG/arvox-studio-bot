@@ -29,4 +29,3 @@ export async function loadSlashCommands(): Promise<SlashCommand[]> {
 
   return commands;
 }
-

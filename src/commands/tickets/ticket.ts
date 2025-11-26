@@ -21,26 +21,33 @@ const command: SlashCommand = {
     .addSubcommand((sub) =>
       sub
         .setName('open')
-        .setDescription('Ein neues Ticket eröffnen')
+        .setDescription('Ein neues Ticket eroeffnen')
         .addStringOption((opt) =>
+          opt.setName('topic').setDescription('Kurze Beschreibung des Anliegens').setRequired(false)
+        )
+        .addStringOption((opt) =>
+          opt.setName('type').setDescription('Ticket-Typ/Workflow').setRequired(false)
+        )
+        .addIntegerOption((opt) =>
           opt
-            .setName('topic')
-            .setDescription('Kurze Beschreibung des Anliegens')
+            .setName('sla_minutes')
+            .setDescription('SLA in Minuten')
+            .setMinValue(5)
             .setRequired(false)
         )
     )
     .addSubcommand((sub) =>
-      sub.setName('claim').setDescription('Ticket übernehmen (Supporter)')
+      sub.setName('claim').setDescription('Ticket uebernehmen (Supporter)')
     )
     .addSubcommand((sub) =>
       sub
         .setName('add')
-        .setDescription('User oder Rolle zum Ticket hinzufügen')
+        .setDescription('User oder Rolle zum Ticket hinzufuegen')
         .addUserOption((opt) =>
-          opt.setName('user').setDescription('User, der hinzugefügt werden soll').setRequired(false)
+          opt.setName('user').setDescription('User, der hinzugefuegt werden soll').setRequired(false)
         )
         .addRoleOption((opt) =>
-          opt.setName('role').setDescription('Rolle, die hinzugefügt werden soll').setRequired(false)
+          opt.setName('role').setDescription('Rolle, die hinzugefuegt werden soll').setRequired(false)
         )
     )
     .addSubcommand((sub) =>
@@ -48,27 +55,18 @@ const command: SlashCommand = {
         .setName('remove')
         .setDescription('User oder Rolle aus dem Ticket entfernen')
         .addUserOption((opt) =>
-          opt
-            .setName('user')
-            .setDescription('User, der entfernt werden soll')
-            .setRequired(false)
+          opt.setName('user').setDescription('User, der entfernt werden soll').setRequired(false)
         )
         .addRoleOption((opt) =>
-          opt
-            .setName('role')
-            .setDescription('Rolle, die entfernt werden soll')
-            .setRequired(false)
+          opt.setName('role').setDescription('Rolle, die entfernt werden soll').setRequired(false)
         )
     )
     .addSubcommand((sub) =>
       sub
         .setName('close')
-        .setDescription('Ticket schließen und Transcript erstellen')
+        .setDescription('Ticket schliessen und Transcript erstellen')
         .addStringOption((opt) =>
-          opt
-            .setName('reason')
-            .setDescription('Optionaler Grund für das Schließen')
-            .setRequired(false)
+          opt.setName('reason').setDescription('Optionaler Grund').setRequired(false)
         )
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.SendMessages),
@@ -105,12 +103,12 @@ const command: SlashCommand = {
             {
               title: 'Support & Tickets',
               description:
-                'Klicke auf den Button, um ein neues Support-Ticket zu eröffnen. Ein Mitglied des Teams meldet sich so schnell wie möglich bei dir.',
+                'Klicke auf den Button, um ein neues Support-Ticket zu eroeffnen. Ein Mitglied des Teams meldet sich so schnell wie moeglich bei dir.',
               fields: [
                 {
                   name: 'Hinweis',
                   value:
-                    'Bitte beschreibe dein Problem so detailliert wie möglich und halte relevante Informationen bereit.'
+                    'Bitte beschreibe dein Problem so detailliert wie moeglich und halte relevante Informationen bereit.'
                 }
               ],
               timestamp: new Date().toISOString()
@@ -123,7 +121,7 @@ const command: SlashCommand = {
                 {
                   type: 2,
                   custom_id: 'ticket_open',
-                  label: 'Ticket eröffnen',
+                  label: 'Ticket eroeffnen',
                   style: 1
                 }
               ]
@@ -144,7 +142,7 @@ const command: SlashCommand = {
       return;
     }
 
-    // Ab hier: nur für Support-/Staff-Rollen
+    // Ab hier: nur fuer Support-/Staff-Rollen
     const member = interaction.member;
     if (!member || !('roles' in member)) {
       await interaction.reply({
@@ -166,7 +164,7 @@ const command: SlashCommand = {
       rolesManager != null && staffRoleIds.some((id) => rolesManager.cache.has(id));
     if (!hasStaffRole) {
       await interaction.reply({
-        content: 'Dieser Subcommand ist nur für Support-/Staff-Rollen verfügbar.',
+        content: 'Dieser Subcommand ist nur fuer Support-/Staff-Rollen verfuegbar.',
         ephemeral: true
       });
       return;
@@ -178,12 +176,12 @@ const command: SlashCommand = {
     }
 
     if (sub === 'add') {
-      await TicketService.addParticipant(interaction);
+      await TicketService.addParticipant(interaction, config);
       return;
     }
 
     if (sub === 'remove') {
-      await TicketService.removeParticipant(interaction);
+      await TicketService.removeParticipant(interaction, config);
       return;
     }
 

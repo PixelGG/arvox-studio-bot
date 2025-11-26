@@ -1,6 +1,6 @@
 import { Schema, model, type Document } from 'mongoose';
 
-export type TicketStatus = 'open' | 'in_progress' | 'closed';
+export type TicketStatus = 'open' | 'in_progress' | 'waiting' | 'closed';
 
 export interface TicketDocument extends Document {
   id: string;
@@ -8,12 +8,18 @@ export interface TicketDocument extends Document {
   channelId: string;
   creatorId: string;
   assignedSupportId?: string;
+  type?: string;
+  notes?: string[];
+  participants?: string[];
   status: TicketStatus;
   topic?: string;
   tags?: string[];
+  slaMinutes?: number;
+  firstResponseAt?: Date;
   createdAt: Date;
   closedAt?: Date;
   transcriptUrl?: string;
+  closeReason?: string;
 }
 
 const TicketSchema = new Schema<TicketDocument>(
@@ -23,15 +29,21 @@ const TicketSchema = new Schema<TicketDocument>(
     channelId: { type: String, required: true },
     creatorId: { type: String, required: true },
     assignedSupportId: { type: String },
+    type: { type: String },
+    notes: [{ type: String }],
     status: {
       type: String,
-      enum: ['open', 'in_progress', 'closed'],
+      enum: ['open', 'in_progress', 'waiting', 'closed'],
       default: 'open'
     },
     topic: { type: String },
     tags: [{ type: String }],
+    slaMinutes: { type: Number },
+    firstResponseAt: { type: Date },
+    participants: [{ type: String }],
     transcriptUrl: { type: String },
-    closedAt: { type: Date }
+    closedAt: { type: Date },
+    closeReason: { type: String }
   },
   {
     timestamps: { createdAt: true, updatedAt: true }
@@ -39,4 +51,3 @@ const TicketSchema = new Schema<TicketDocument>(
 );
 
 export const TicketModel = model<TicketDocument>('Ticket', TicketSchema);
-

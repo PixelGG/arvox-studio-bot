@@ -83,12 +83,16 @@ export class TicketService {
     }
 
     const topic = interaction.options.getString('topic') ?? 'Allgemeines Support-Ticket';
+    const type = interaction.options.getString('type') ?? undefined;
+    const slaMinutes = interaction.options.getInteger('sla_minutes') ?? undefined;
     const ticket = await this.createTicketChannel(
       interaction.member as GuildMember,
       interaction.user,
       interaction.guild.channels.cache.get(guildConfig.tickets.categoryId) ?? null,
       guildConfig,
-      topic
+      topic,
+      type,
+      slaMinutes
     );
 
     await interaction.reply({
@@ -104,7 +108,9 @@ export class TicketService {
     user: User,
     category: any,
     guildConfig: GuildConfig,
-    topic?: string
+    topic?: string,
+    type?: string,
+    slaMinutes?: number
   ): Promise<TicketDocument | null> {
     const guild = member.guild;
     const shortId = nanoid(6);
@@ -142,6 +148,9 @@ export class TicketService {
       guildId: guild.id,
       channelId: channel.id,
       creatorId: user.id,
+      type,
+      slaMinutes,
+      participants: [user.id],
       status: 'open',
       topic
     });
@@ -192,17 +201,35 @@ export class TicketService {
     ticket.status = 'in_progress';
     await ticket.save();
 
+    await LoggingService.logSupportEvent(
+      interaction.guild,
+      config,
+      'Ticket uebernommen',
+      `Ticket #${ticket.id} von <@${interaction.user.id}> uebernommen.`
+    );
+
     await interaction.reply({
-      content: `Ticket übernommen von <@${interaction.user.id}>.`,
+      content: `Ticket uebernommen von <@${interaction.user.id}>.`,
       ephemeral: false
     });
   }
 
   static async addParticipant(
-    interaction: ChatInputCommandInteraction
+    interaction: ChatInputCommandInteraction,
+    config: AppConfig
   ): Promise<void> {
     if (!interaction.guild || !interaction.channel) {
       await interaction.reply({ content: 'Nur in Ticket-Channels verwendbar.', ephemeral: true });
+      return;
+    }
+
+    const ticket = await TicketModel.findOne({
+      guildId: interaction.guild.id,
+      channelId: interaction.channel.id
+    }).exec();
+
+    if (!ticket) {
+      await interaction.reply({ content: 'Dieses Channel ist kein Ticket.', ephemeral: true });
       return;
     }
 
@@ -231,17 +258,40 @@ export class TicketService {
       });
     }
 
+    if (user && !ticket.participants?.includes(user.id)) {
+      ticket.participants = [...(ticket.participants ?? []), user.id];
+      await ticket.save();
+    }
+
+    await LoggingService.logSupportEvent(
+      interaction.guild,
+      config,
+      'Ticket Teilnehmer hinzugefuegt',
+      `Ticket #${ticket.id}: + ${user ? `<@${user.id}>` : ''}${role ? ` ${role}` : ''}`
+    );
+
     await interaction.reply({
-      content: 'Teilnehmer wurden zum Ticket hinzugefügt.',
+      content: 'Teilnehmer wurden zum Ticket hinzugefuegt.',
       ephemeral: true
     });
   }
 
   static async removeParticipant(
-    interaction: ChatInputCommandInteraction
+    interaction: ChatInputCommandInteraction,
+    config: AppConfig
   ): Promise<void> {
     if (!interaction.guild || !interaction.channel) {
       await interaction.reply({ content: 'Nur in Ticket-Channels verwendbar.', ephemeral: true });
+      return;
+    }
+
+    const ticket = await TicketModel.findOne({
+      guildId: interaction.guild.id,
+      channelId: interaction.channel.id
+    }).exec();
+
+    if (!ticket) {
+      await interaction.reply({ content: 'Dieses Channel ist kein Ticket.', ephemeral: true });
       return;
     }
 
@@ -262,6 +312,18 @@ export class TicketService {
         SendMessages: false
       });
     }
+
+    if (user && ticket.participants?.includes(user.id)) {
+      ticket.participants = ticket.participants.filter((id) => id !== user.id);
+      await ticket.save();
+    }
+
+    await LoggingService.logSupportEvent(
+      interaction.guild,
+      config,
+      'Ticket Teilnehmer entfernt',
+      `Ticket #${ticket.id}: - ${user ? `<@${user.id}>` : ''}${role ? ` ${role}` : ''}`
+    );
 
     await interaction.reply({
       content: 'Teilnehmer wurden aus dem Ticket entfernt.',
@@ -326,7 +388,15 @@ export class TicketService {
     ticket.status = 'closed';
     ticket.closedAt = new Date();
     ticket.transcriptUrl = transcriptUrl ?? undefined;
+    ticket.closeReason = reason;
     await ticket.save();
+
+    await LoggingService.logSupportEvent(
+      interaction.guild,
+      config,
+      'Ticket geschlossen',
+      `Ticket #${ticket.id} wurde von <@${interaction.user.id}> geschlossen. Grund: ${reason}.`
+    );
 
     await interaction.reply({
       content: 'Ticket wird geschlossen. Vielen Dank!',
@@ -409,6 +479,11 @@ export class TicketService {
       closedAt
         ? `<div><span class="meta-label">Geschlossen am:</span> <span class="meta-value">${closedAt.toLocaleString(
             'de-DE'
+          )}</span></div>`
+        : '',
+      ticket.closeReason
+        ? `<div><span class="meta-label">Schliessgrund:</span> <span class="meta-value">${TicketService.escapeHtml(
+            ticket.closeReason
           )}</span></div>`
         : '',
       durationMinutes !== undefined
